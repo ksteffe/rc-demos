@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-api-catalog
+  namespace: platform-demo-system
+data:
+  todos-api.catalog-info.yaml: |
+    apiVersion: backstage.io/v1alpha1
+    kind: API
+    metadata:
+      name: todos-api
+      annotations:
+        platform.demoteam.io/base-url: http://todos-api.demo.svc.cluster.local:8080
+    spec:
+      type: openapi
+      lifecycle: production
+      owner: group:default/platform
+      definition:
+        $text: ./todos.openapi.yaml
+  todos.openapi.yaml: |
+    openapi: 3.0.3
+    info:
+      title: Todos API
+      version: 1.0.0
+    paths:
+      /todos/{id}:
+        get:
+          responses:
+            "200":
+              description: Todo
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    required:
+                      - id
+                      - title
+                      - completed
+                    properties:
+                      id:
+                        type: integer
+                      title:
+                        type: string
+                      completed:
+                        type: boolean
