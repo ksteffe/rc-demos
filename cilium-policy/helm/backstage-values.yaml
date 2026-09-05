@@ -13,6 +13,10 @@ backstage:
       readOnly: true
   appConfig:
     app:
+      # appConfig replaces the image's own app-config chain rather than layering
+      # on it, so upstream defaults must be repeated here. Without this the
+      # frontend installs no plugins and their API factories go unregistered.
+      packages: all
       title: Runtime Conditions Demo Catalog
       baseUrl: http://localhost:7007
     organization:
