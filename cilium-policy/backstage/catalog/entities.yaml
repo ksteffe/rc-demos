@@ -109,8 +109,63 @@ spec:
   lifecycle: experimental
   owner: group:default/community-platform
   system: community-resource-fulfillment
-  definition:
-    $text: ./inventory.openapi.yaml
+  definition: |
+    openapi: 3.0.3
+    info:
+      title: Inventory API
+      version: 1.0.0
+    paths:
+      /items/{itemId}/availability:
+        get:
+          operationId: getItemAvailability
+          parameters:
+            - name: itemId
+              in: path
+              required: true
+              schema:
+                type: string
+          responses:
+            "200":
+              description: Current available quantity
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    required: [itemId, available]
+                    properties:
+                      itemId:
+                        type: string
+                      available:
+                        type: integer
+      /reservations:
+        post:
+          operationId: createReservation
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required: [requestId, itemId, quantity]
+                  properties:
+                    requestId:
+                      type: string
+                    itemId:
+                      type: string
+                    quantity:
+                      type: integer
+                      minimum: 1
+          responses:
+            "201":
+              description: Reservation created
+            "409":
+              description: Insufficient stock
+      /admin/items:
+        post:
+          operationId: createInventoryItem
+          responses:
+            "201":
+              description: Item created
 ---
 apiVersion: backstage.io/v1alpha1
 kind: API
@@ -122,8 +177,38 @@ spec:
   lifecycle: experimental
   owner: group:default/community-platform
   system: community-resource-fulfillment
-  definition:
-    $text: ./fulfillment.openapi.yaml
+  definition: |
+    openapi: 3.0.3
+    info:
+      title: Fulfillment API
+      version: 1.0.0
+    paths:
+      /fulfillment-tasks:
+        post:
+          operationId: createFulfillmentTask
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required: [requestId, itemId, quantity]
+                  properties:
+                    requestId:
+                      type: string
+                    itemId:
+                      type: string
+                    quantity:
+                      type: integer
+          responses:
+            "201":
+              description: Task created
+      /fulfillment-tasks/{taskId}:
+        get:
+          operationId: getFulfillmentTask
+          responses:
+            "200":
+              description: Task state
 ---
 apiVersion: backstage.io/v1alpha1
 kind: API
@@ -135,8 +220,24 @@ spec:
   lifecycle: experimental
   owner: group:default/community-platform
   system: community-resource-fulfillment
-  definition:
-    $text: ./donor-directory.openapi.yaml
+  definition: |
+    openapi: 3.0.3
+    info:
+      title: Donor Directory API
+      version: 1.0.0
+    paths:
+      /donors/{donorId}:
+        get:
+          operationId: getDonor
+          responses:
+            "200":
+              description: Donor record
+      /donors/search:
+        post:
+          operationId: searchDonors
+          responses:
+            "200":
+              description: Matching donors
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Resource

@@ -8,7 +8,4 @@ configMapGenerator:
     files:
       - catalog/all.yaml
       - catalog/entities.yaml
-      - catalog/inventory.openapi.yaml
-      - catalog/fulfillment.openapi.yaml
-      - catalog/donor-directory.openapi.yaml
 

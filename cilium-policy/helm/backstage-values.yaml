@@ -13,9 +13,8 @@ backstage:
       readOnly: true
   appConfig:
     app:
-      # appConfig replaces the image's own app-config chain rather than layering
-      # on it, so upstream defaults must be repeated here. Without this the
-      # frontend installs no plugins and their API factories go unregistered.
+      # The chart passes only this file to the backend, so it replaces the
+      # image's own app-config rather than layering onto it.
       packages: all
       title: Runtime Conditions Demo Catalog
       baseUrl: http://localhost:7007
@@ -38,6 +37,10 @@ backstage:
     permission:
       enabled: false
     catalog:
+      # Group is absent from the default allow-list, and one rejected kind
+      # discards every entity the location emitted, not just that one.
+      rules:
+        - allow: [Component, System, API, Resource, Location, Group]
       locations:
         - type: file
           target: /app/catalog/all.yaml
@@ -58,6 +61,12 @@ postgresql:
     username: backstage
     password: backstage-demo-only
     database: backstage
+    # The subchart writes these key names but the parent chart's defaults point
+    # its read-back lookup at existingSecret key names, so every upgrade after
+    # the initial install fails on the key it never wrote.
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
 
 serviceAccount:
   create: true
