@@ -4,6 +4,7 @@ The scripts in ../scripts run these commands with error checking.
 
 ~~~bash
 source ./versions.env
+CONTAINER_ENGINE=podman  # or docker
 
 kind create cluster \
   --name "${KIND_CLUSTER_NAME}" \
@@ -22,16 +23,9 @@ helm upgrade --install cilium cilium/cilium \
   --wait
 
 kubectl apply -f ./cluster/namespaces.yaml
-kubectl apply -k ./backstage
-
-helm upgrade --install backstage backstage/backstage \
-  --namespace backstage \
-  --version "${BACKSTAGE_CHART_VERSION}" \
-  --values ./helm/backstage-values.yaml \
-  --wait
-
-kubectl apply -f ./manifests/backstage-rbac.yaml
 kubectl apply -f ./manifests/dependencies.yaml
+kubectl apply -k ./backstage
+kubectl apply -f ./manifests/backstage-rbac.yaml
 
 helm upgrade --install event-bus nats/nats \
   --namespace dependencies \
@@ -39,12 +33,27 @@ helm upgrade --install event-bus nats/nats \
   --values ./helm/nats-values.yaml \
   --wait
 
-docker build -t rc-resource-demo:local ./apps/resource-demo
-kind load docker-image rc-resource-demo:local --name "${KIND_CLUSTER_NAME}"
+helm upgrade --install backstage backstage/backstage \
+  --namespace backstage \
+  --version "${BACKSTAGE_CHART_VERSION}" \
+  --values ./helm/backstage-values.yaml \
+  --wait
+
+"${CONTAINER_ENGINE}" build -t localhost/rc-resource-demo:local ./apps/resource-demo
+"${CONTAINER_ENGINE}" save localhost/rc-resource-demo:local -o /tmp/rc-resource-demo.tar
+kind load image-archive /tmp/rc-resource-demo.tar --name "${KIND_CLUSTER_NAME}"
+rm -f /tmp/rc-resource-demo.tar
+
 kubectl apply -f ./manifests/applications.yaml
 kubectl apply -f ./manifests/provider-egress.yaml
 kubectl apply -f ./manifests/default-deny-egress.yaml
 ~~~
+
+The RBAC binding is applied before the Backstage release so the service account
+can read cluster resources from the moment the pod starts.
+
+The image is loaded from an archive because `kind load docker-image` shells out
+to the `docker` CLI, which is absent on Podman-only hosts.
 
 The final kubectl apply activates egress isolation for application workloads.
 DNS remains allowed so the adapter can prove the difference between name

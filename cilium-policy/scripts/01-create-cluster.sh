@@ -5,7 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=_lib.sh
 source "${SCRIPT_DIR}/_lib.sh"
 
-for command_name in docker kind helm kubectl; do
+require_container_engine
+for command_name in kind helm kubectl; do
   require_command "${command_name}"
 done
 

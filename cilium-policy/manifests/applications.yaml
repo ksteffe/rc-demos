@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
         - name: service
-          image: rc-resource-demo:local
+          image: localhost/rc-resource-demo:local
           imagePullPolicy: Never
           ports:
             - name: http
@@ -104,7 +104,7 @@ spec:
     spec:
       containers:
         - name: service
-          image: rc-resource-demo:local
+          image: localhost/rc-resource-demo:local
           imagePullPolicy: Never
           ports:
             - name: http
@@ -164,7 +164,7 @@ spec:
     spec:
       containers:
         - name: service
-          image: rc-resource-demo:local
+          image: localhost/rc-resource-demo:local
           imagePullPolicy: Never
           ports:
             - name: http
@@ -210,7 +210,7 @@ spec:
     spec:
       containers:
         - name: worker
-          image: rc-resource-demo:local
+          image: localhost/rc-resource-demo:local
           imagePullPolicy: Never
           env:
             - name: SERVICE_ROLE
@@ -262,7 +262,7 @@ spec:
     spec:
       containers:
         - name: service
-          image: rc-resource-demo:local
+          image: localhost/rc-resource-demo:local
           imagePullPolicy: Never
           ports:
             - name: http

@@ -28,7 +28,7 @@ their Kubernetes provenance.
 
 ## Prerequisites
 
-- Docker
+- Docker (or Podman)
 - KinD
 - Helm 3
 - kubectl

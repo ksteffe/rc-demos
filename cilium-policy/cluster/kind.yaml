@@ -2,6 +2,10 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 networking:
   disableDefaultCNI: true
+  # Nodes inherit the host's DNS search domains by default. A wildcard-resolving
+  # domain there wins the resolver's search list before the literal name is
+  # tried, so in-cluster FQDNs resolve to an off-cluster address.
+  dnsSearch: []
 nodes:
   - role: control-plane
   - role: worker

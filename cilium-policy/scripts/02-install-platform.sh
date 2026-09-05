@@ -9,6 +9,7 @@ use_demo_context
 kubectl apply -f "${DEMO_DIR}/cluster/namespaces.yaml"
 kubectl apply -f "${DEMO_DIR}/manifests/dependencies.yaml"
 kubectl apply -k "${DEMO_DIR}/backstage"
+kubectl apply -f "${DEMO_DIR}/manifests/backstage-rbac.yaml"
 
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/ --force-update
 helm repo add backstage https://backstage.github.io/charts --force-update
@@ -28,7 +29,6 @@ helm upgrade --install backstage backstage/backstage \
   --wait \
   --timeout 10m
 
-kubectl apply -f "${DEMO_DIR}/manifests/backstage-rbac.yaml"
 kubectl -n dependencies rollout status statefulset/resource-database --timeout=5m
 kubectl -n dependencies rollout status statefulset/availability-cache --timeout=5m
 kubectl -n backstage rollout status deployment/backstage --timeout=5m
