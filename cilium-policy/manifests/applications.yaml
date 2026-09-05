@@ -1,0 +1,284 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: intake-gateway-v1
+  namespace: applications
+  labels:
+    backstage.io/kubernetes-id: request-coordinator
+spec:
+  selector:
+    app.kubernetes.io/name: request-coordinator
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: request-coordinator
+  namespace: applications
+  labels:
+    backstage.io/kubernetes-id: request-coordinator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: request-coordinator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: request-coordinator
+        backstage.io/kubernetes-id: request-coordinator
+        network.runtimeconditions.io/plane: data
+    spec:
+      containers:
+        - name: service
+          image: rc-resource-demo:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_ROLE
+              value: request
+            - name: INVENTORY_URL
+              value: http://stock-provider-v2.applications.svc.cluster.local:8080
+            - name: FULFILLMENT_URL
+              value: http://dispatch-planner-v1.applications.svc.cluster.local:8080
+            - name: DATABASE_URL
+              value: postgres://resources:local-demo-only@resource-records-v1.dependencies.svc.cluster.local:5432/resources?sslmode=disable
+            - name: REDIS_HOST
+              value: availability-cache-v1.dependencies.svc.cluster.local
+            - name: REDIS_PORT
+              value: "6379"
+            - name: NATS_URL
+              value: nats://event-bus-nats.dependencies.svc.cluster.local:4222
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stock-provider-v2
+  namespace: applications
+  labels:
+    backstage.io/kubernetes-id: inventory-service
+spec:
+  selector:
+    app.kubernetes.io/name: inventory-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: applications
+  labels:
+    backstage.io/kubernetes-id: inventory-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inventory-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inventory-service
+        backstage.io/kubernetes-id: inventory-service
+        network.runtimeconditions.io/plane: data
+        platform.runtimeconditions.io/postgres-client: "true"
+    spec:
+      containers:
+        - name: service
+          image: rc-resource-demo:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_ROLE
+              value: inventory
+            - name: DATABASE_URL
+              value: postgres://resources:local-demo-only@resource-records-v1.dependencies.svc.cluster.local:5432/resources?sslmode=disable
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dispatch-planner-v1
+  namespace: applications
+  labels:
+    backstage.io/kubernetes-id: fulfillment-service
+spec:
+  selector:
+    app.kubernetes.io/name: fulfillment-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fulfillment-service
+  namespace: applications
+  labels:
+    backstage.io/kubernetes-id: fulfillment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fulfillment-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fulfillment-service
+        backstage.io/kubernetes-id: fulfillment-service
+        network.runtimeconditions.io/plane: data
+        platform.runtimeconditions.io/postgres-client: "true"
+    spec:
+      containers:
+        - name: service
+          image: rc-resource-demo:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_ROLE
+              value: fulfillment
+            - name: DATABASE_URL
+              value: postgres://resources:local-demo-only@resource-records-v1.dependencies.svc.cluster.local:5432/resources?sslmode=disable
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-worker
+  namespace: applications
+  labels:
+    backstage.io/kubernetes-id: notification-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-worker
+        backstage.io/kubernetes-id: notification-worker
+        network.runtimeconditions.io/plane: data
+        platform.runtimeconditions.io/postgres-client: "true"
+        platform.runtimeconditions.io/nats-client: "true"
+    spec:
+      containers:
+        - name: worker
+          image: rc-resource-demo:local
+          imagePullPolicy: Never
+          env:
+            - name: SERVICE_ROLE
+              value: notification
+            - name: DATABASE_URL
+              value: postgres://resources:local-demo-only@resource-records-v1.dependencies.svc.cluster.local:5432/resources?sslmode=disable
+            - name: NATS_URL
+              value: nats://event-bus-nats.dependencies.svc.cluster.local:4222
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supporter-index-v1
+  namespace: applications
+  labels:
+    backstage.io/kubernetes-id: donor-directory
+spec:
+  selector:
+    app.kubernetes.io/name: donor-directory
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: donor-directory
+  namespace: applications
+  labels:
+    backstage.io/kubernetes-id: donor-directory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: donor-directory
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: donor-directory
+        backstage.io/kubernetes-id: donor-directory
+        network.runtimeconditions.io/plane: data
+    spec:
+      containers:
+        - name: service
+          image: rc-resource-demo:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_ROLE
+              value: directory
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 128Mi

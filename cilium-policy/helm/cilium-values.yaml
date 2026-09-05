@@ -1,0 +1,14 @@
+ipam:
+  mode: kubernetes
+kubeProxyReplacement: false
+routingMode: tunnel
+tunnelProtocol: vxlan
+l7Proxy: true
+operator:
+  replicas: 1
+hubble:
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+

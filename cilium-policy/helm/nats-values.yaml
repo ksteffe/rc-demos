@@ -1,0 +1,25 @@
+config:
+  cluster:
+    enabled: true
+    replicas: 3
+  jetstream:
+    enabled: true
+    fileStore:
+      pvc:
+        size: 1Gi
+
+container:
+  merge:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+
+podTemplate:
+  merge:
+    metadata:
+      labels:
+        backstage.io/kubernetes-id: event-bus
+

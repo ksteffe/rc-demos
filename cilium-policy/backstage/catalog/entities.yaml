@@ -1,0 +1,194 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: community-platform
+  description: Team operating the resource fulfillment platform
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: community-resource-fulfillment
+  description: Accepts, reserves, and fulfills requests for community resources
+spec:
+  owner: group:default/community-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: request-coordinator
+  description: Public workflow API for resource requests
+  annotations:
+    backstage.io/kubernetes-id: request-coordinator
+    backstage.io/kubernetes-namespace: applications
+    backstage.io/source-location: url:https://github.com/runtimeconditions/rc-demos/tree/main/cilium-policy/apps/resource-demo/services/request-coordinator
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: inventory-service
+  description: Owns item availability and durable reservations
+  annotations:
+    backstage.io/kubernetes-id: inventory-service
+    backstage.io/kubernetes-namespace: applications
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  providesApis:
+    - inventory-api
+  dependsOn:
+    - resource:default/resource-database
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: fulfillment-service
+  description: Creates and tracks delivery work
+  annotations:
+    backstage.io/kubernetes-id: fulfillment-service
+    backstage.io/kubernetes-namespace: applications
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  providesApis:
+    - fulfillment-api
+  dependsOn:
+    - resource:default/resource-database
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: notification-worker
+  description: Records notifications from fulfillment events
+  annotations:
+    backstage.io/kubernetes-id: notification-worker
+    backstage.io/kubernetes-namespace: applications
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  dependsOn:
+    - resource:default/resource-database
+    - resource:default/event-bus
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: donor-directory
+  description: Unrelated API included to make capability matching meaningful
+  annotations:
+    backstage.io/kubernetes-id: donor-directory
+    backstage.io/kubernetes-namespace: applications
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  providesApis:
+    - donor-directory-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: inventory-api
+  description: Availability and reservation capabilities
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  definition:
+    $text: ./inventory.openapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: fulfillment-api
+  description: Durable fulfillment task capabilities
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  definition:
+    $text: ./fulfillment.openapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: donor-directory-api
+  description: A catalog decoy that must not match the profile
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  definition:
+    $text: ./donor-directory.openapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: resource-database
+  description: Shared demo PostgreSQL instance
+  annotations:
+    backstage.io/kubernetes-id: resource-database
+    backstage.io/kubernetes-namespace: dependencies
+    demo.platform.io/interface: relational
+    demo.platform.io/engine: postgres
+spec:
+  type: database
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  dependencyOf:
+    - component:default/request-coordinator
+    - component:default/inventory-service
+    - component:default/fulfillment-service
+    - component:default/notification-worker
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: availability-cache
+  description: Persistent Redis cache used by the coordinator
+  annotations:
+    backstage.io/kubernetes-id: availability-cache
+    backstage.io/kubernetes-namespace: dependencies
+    demo.platform.io/interface: key_value
+    demo.platform.io/engine: redis
+spec:
+  type: cache
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  dependencyOf:
+    - component:default/request-coordinator
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: event-bus
+  description: NATS cluster used for fulfillment events
+  annotations:
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/instance=event-bus
+    backstage.io/kubernetes-namespace: dependencies
+    demo.platform.io/interface: service
+    demo.platform.io/engine: nats
+spec:
+  type: message-broker
+  owner: group:default/community-platform
+  system: community-resource-fulfillment
+  dependencyOf:
+    - component:default/request-coordinator
+    - component:default/notification-worker

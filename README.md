@@ -17,6 +17,8 @@ This tree contains runnable examples and downstream adapter assets.
 - `catalog/apis/` - OpenAPI and catalog files used by the adapter demo.
 - `kratix/` - Kratix Promise and adapter assets for downstream fulfillment demos.
 - `kratix/manifests/` - static Kubernetes and Kratix manifests applied by the demo scripts.
+- `cilium-policy/` - a complete KinD, Cilium, Backstage, and microservice lab for
+  building an RCProfile-to-CiliumNetworkPolicy adapter.
 
 ## Generate the Request Logger Profile
 

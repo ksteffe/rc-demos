@@ -1,0 +1,55 @@
+apiVersion: runtimeconditions.io/v1alpha1
+kind: RuntimeConditionsProfile
+metadata:
+  name: request-coordinator
+workload:
+  uri: https://github.com/runtimeconditions/rc-demos/tree/main/cilium-policy/apps/resource-demo/services/request-coordinator
+  version: dev
+extensions:
+  - https://runtimeconditions.io/extensions/common-integrations/v1alpha1/runtimeconditions.extension.yaml
+  - https://runtimeconditions.io/extensions/env-configuration/v1alpha1/runtimeconditions.extension.yaml
+conditions:
+  - name: available-stock-capability
+    kind: api
+    interface:
+      type: http
+      operations:
+        - method: GET
+          path: /items/{itemId}/availability
+        - method: POST
+          path: /reservations
+    configuration:
+      env:
+        - property: baseUrl
+          name: INVENTORY_URL
+  - name: delivery-work-capability
+    kind: api
+    interface:
+      type: http
+      operations:
+        - method: POST
+          path: /fulfillment-tasks
+    configuration:
+      env:
+        - property: baseUrl
+          name: FULFILLMENT_URL
+  - name: durable-request-history
+    kind: datastore
+    interface:
+      type: relational
+      engine: postgres
+    configuration:
+      env:
+        - property: url
+          name: DATABASE_URL
+  - name: transient-request-lookup
+    kind: cache
+    interface:
+      type: key_value
+      engine: redis
+    configuration:
+      env:
+        - property: hostname
+          name: REDIS_HOST
+        - property: port
+          name: REDIS_PORT

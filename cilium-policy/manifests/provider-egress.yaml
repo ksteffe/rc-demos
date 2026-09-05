@@ -1,0 +1,38 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: platform-provider-postgres-egress
+  namespace: applications
+spec:
+  endpointSelector:
+    matchLabels:
+      platform.runtimeconditions.io/postgres-client: "true"
+  egress:
+    - toServices:
+        - k8sService:
+            serviceName: resource-records-v1
+            namespace: dependencies
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: platform-notification-nats-egress
+  namespace: applications
+spec:
+  endpointSelector:
+    matchLabels:
+      platform.runtimeconditions.io/nats-client: "true"
+  egress:
+    - toServices:
+        - k8sService:
+            serviceName: event-bus-nats
+            namespace: dependencies
+      toPorts:
+        - ports:
+            - port: "4222"
+              protocol: TCP
+

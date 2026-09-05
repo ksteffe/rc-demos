@@ -1,0 +1,61 @@
+backstage:
+  image:
+    registry: ghcr.io
+    repository: backstage/backstage
+    tag: "1.53.0"
+  extraVolumes:
+    - name: demo-catalog
+      configMap:
+        name: backstage-demo-catalog
+  extraVolumeMounts:
+    - name: demo-catalog
+      mountPath: /app/catalog
+      readOnly: true
+  appConfig:
+    app:
+      title: Runtime Conditions Demo Catalog
+      baseUrl: http://localhost:7007
+    organization:
+      name: Runtime Conditions
+    backend:
+      baseUrl: http://localhost:7007
+      listen:
+        port: 7007
+      auth:
+        dangerouslyDisableDefaultAuthPolicy: true
+      cors:
+        origin: http://localhost:7007
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: true
+    auth:
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
+    permission:
+      enabled: false
+    catalog:
+      locations:
+        - type: file
+          target: /app/catalog/all.yaml
+    kubernetes:
+      serviceLocatorMethod:
+        type: multiTenant
+      clusterLocatorMethods:
+        - type: config
+          clusters:
+            - name: rc-cilium
+              url: https://kubernetes.default.svc.cluster.local
+              authProvider: serviceAccount
+              skipMetricsLookup: true
+
+postgresql:
+  enabled: true
+  auth:
+    username: backstage
+    password: backstage-demo-only
+    database: backstage
+
+serviceAccount:
+  create: true
+  name: backstage
+  automountServiceAccountToken: true

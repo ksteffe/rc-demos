@@ -1,0 +1,10 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: runtime-conditions-demo
+  description: Catalog fixtures for the RCProfile to Cilium policy lab
+spec:
+  type: file
+  targets:
+    - /app/catalog/entities.yaml
+

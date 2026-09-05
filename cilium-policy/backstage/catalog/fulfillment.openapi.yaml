@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: Fulfillment API
+  version: 1.0.0
+paths:
+  /fulfillment-tasks:
+    post:
+      operationId: createFulfillmentTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, itemId, quantity]
+              properties:
+                requestId:
+                  type: string
+                itemId:
+                  type: string
+                quantity:
+                  type: integer
+      responses:
+        "201":
+          description: Task created
+  /fulfillment-tasks/{taskId}:
+    get:
+      operationId: getFulfillmentTask
+      responses:
+        "200":
+          description: Task state
+

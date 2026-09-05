@@ -1,0 +1,18 @@
+openapi: 3.0.3
+info:
+  title: Donor Directory API
+  version: 1.0.0
+paths:
+  /donors/{donorId}:
+    get:
+      operationId: getDonor
+      responses:
+        "200":
+          description: Donor record
+  /donors/search:
+    post:
+      operationId: searchDonors
+      responses:
+        "200":
+          description: Matching donors
+

@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: backstage
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: backstage-demo-catalog
+    files:
+      - catalog/all.yaml
+      - catalog/entities.yaml
+      - catalog/inventory.openapi.yaml
+      - catalog/fulfillment.openapi.yaml
+      - catalog/donor-directory.openapi.yaml
+
