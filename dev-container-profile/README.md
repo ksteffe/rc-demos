@@ -29,8 +29,24 @@ from application code is a possible later experiment, not a prerequisite.
 
 ## Get oriented
 
-Open this directory in VS Code and choose **Reopen in Container**. The parent
-workspace is mounted so the following sibling layout is available:
+This demo uses three separate Git repositories:
+
+- [`runtimeconditions/rc-demos`](https://github.com/runtimeconditions/rc-demos)
+- [`runtimeconditions/extensions`](https://github.com/runtimeconditions/extensions)
+- [`runtimeconditions/go-rc-profiler`](https://github.com/runtimeconditions/go-rc-profiler)
+
+Clone all three repositories into the same parent directory, using these
+directory names:
+
+```sh
+mkdir runtimeconditions
+cd runtimeconditions
+git clone https://github.com/runtimeconditions/rc-demos.git
+git clone https://github.com/runtimeconditions/extensions.git
+git clone https://github.com/runtimeconditions/go-rc-profiler.git
+```
+
+The resulting local workspace must have this sibling layout:
 
 ```text
 runtimeconditions/
@@ -40,8 +56,13 @@ runtimeconditions/
     └── dev-container-profile/
 ```
 
-Without VS Code Dev Containers, install Go 1.25, Git, Python 3, and curl and use
-the same checkout layout.
+Then open `rc-demos/dev-container-profile/` in VS Code and choose **Reopen in
+Container**. The development-container configuration mounts the shared parent
+directory so it can access the separately cloned `extensions` and
+`go-rc-profiler` repositories through the relative paths used by the demo.
+
+Without VS Code Dev Containers, install Go 1.25, Git, Python 3, and curl. The
+three repositories must still be checked out with the same sibling layout.
 
 Run the supplied pieces independently:
 
@@ -58,4 +79,3 @@ There is no single expected executable, package layout, intermediate format, or
 watching mechanism. A useful contribution may begin as a design note, a small
 pipeline stage, an experiment comparing representations, or a complete
 end-to-end demo.
-
