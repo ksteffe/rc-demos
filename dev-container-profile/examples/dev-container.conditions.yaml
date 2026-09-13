@@ -1,0 +1,15 @@
+# Illustrative wrapper-owned requirements. The implementer may choose another
+# authoring or storage model.
+extensions:
+  - https://runtimeconditions.io/extensions/source-control/0.1.0/runtimeconditions.extension.yaml
+
+conditions:
+  - name: application-source
+    kind: source_control
+    interface:
+      type: git
+      provider: github
+      access:
+        - fetch
+        - pull
+        - push

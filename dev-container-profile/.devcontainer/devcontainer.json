@@ -1,0 +1,17 @@
+{
+  "name": "Runtime Conditions profile composition demo",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder}/..,target=/workspaces/runtimeconditions,type=bind,consistency=cached",
+  "workspaceFolder": "/workspaces/runtimeconditions/rc-demos/dev-container-profile",
+  "postCreateCommand": "go mod download && (cd ../../go-rc-profiler && go mod download)",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "redhat.vscode-yaml"
+      ]
+    }
+  }
+}

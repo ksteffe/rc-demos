@@ -1,0 +1,16 @@
+# Illustrative composition input. Profile composition is not part of the core
+# specification, so the implementer is free to replace this shape.
+apiVersion: tooling.runtimeconditions.io/v1alpha1
+kind: ProfileCompositionRecipe
+
+metadata:
+  name: web-demo-dev-container
+
+target:
+  metadata:
+    name: web-demo-dev-container
+    labels:
+      lifecycle.example.com/stage: development
+  workload:
+    uri: https://github.com/runtimeconditions/rc-demos/tree/main/dev-container-profile#dev-container
+    version: demo

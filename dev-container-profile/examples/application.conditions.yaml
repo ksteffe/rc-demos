@@ -1,0 +1,16 @@
+# Illustrative authoring input. This shape is not defined by the specification
+# and may be replaced by the demo implementation.
+extensions:
+  - https://runtimeconditions.io/extensions/google-analytics/0.1.0/runtimeconditions.extension.yaml
+
+conditions:
+  - name: site-analytics
+    kind: google.analytics
+    interface:
+      type: web
+      events:
+        - page_view
+    configuration:
+      env:
+        - property: measurementId
+          name: GA_MEASUREMENT_ID

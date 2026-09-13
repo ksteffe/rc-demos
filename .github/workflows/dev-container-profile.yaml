@@ -1,0 +1,104 @@
+name: Dev-container Profile demo foundation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/dev-container-profile.yaml"
+      - "dev-container-profile/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/dev-container-profile.yaml"
+      - "dev-container-profile/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# These jobs prove only that the exploration environment is sound. They are
+# deliberately separate so a contributor can extend the workflow with logical
+# Condition extraction, composition, validation, and observation phases and
+# pass artifacts between them.
+jobs:
+  extensions:
+    name: Validate extension vocabulary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/extensions
+          path: extensions
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/go-rc-profiler
+          path: go-rc-profiler
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go-rc-profiler/go.mod
+          cache-dependency-path: go-rc-profiler/go.sum
+      - name: Validate Google Analytics and source-control extensions
+        working-directory: go-rc-profiler
+        run: |
+          go run . validate-extension -root ../extensions/google-analytics
+          go run . validate-extension -root ../extensions/source-control
+
+  application:
+    name: Exercise the target application
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: rc-demos
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/extensions
+          path: extensions
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: rc-demos/dev-container-profile/go.mod
+          cache-dependency-path: rc-demos/dev-container-profile/go.sum
+      - name: Run application tests
+        working-directory: rc-demos/dev-container-profile
+        run: go test ./...
+      - name: Exercise the running web application
+        working-directory: rc-demos/dev-container-profile
+        run: ./scripts/smoke-test.sh
+
+  application-profile:
+    name: Profile the application
+    needs:
+      - extensions
+      - application
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: rc-demos
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/extensions
+          path: extensions
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/go-rc-profiler
+          path: go-rc-profiler
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go-rc-profiler/go.mod
+          cache-dependency-path: |
+            go-rc-profiler/go.sum
+            rc-demos/dev-container-profile/go.sum
+      - name: Generate the application Profile
+        working-directory: rc-demos/dev-container-profile
+        run: ./scripts/generate-application-profile.sh
+      - name: Retain the profiler output for later pipeline phases
+        uses: actions/upload-artifact@v7
+        with:
+          name: application-profiler-output-${{ github.run_id }}
+          path: rc-demos/dev-container-profile/artifacts/application.profiler.yaml
+          if-no-files-found: error
+          retention-days: 30

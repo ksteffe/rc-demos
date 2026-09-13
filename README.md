@@ -14,6 +14,7 @@ This tree contains runnable examples and downstream adapter assets.
 - `apps/request-logger-http/` - Go workload that imports first-party declaration packages and demonstrates explicit profile declarations.
 - `apps/request-logger-http-java/` - Java workload with matching explicit declarations for the same Conditions as the Go request logger.
 - `apps/todos-api/` - simple provider API used by the request logger demo.
+- `dev-container-profile/` - development scaffold and acceptance contract for a build-time Profile composition demo. Implementers should start with [`dev-container-profile/README.md`](dev-container-profile/README.md).
 - `catalog/apis/` - OpenAPI and catalog files used by the adapter demo.
 - `kratix/` - Kratix Promise and adapter assets for downstream fulfillment demos.
 - `kratix/manifests/` - static Kubernetes and Kratix manifests applied by the demo scripts.
