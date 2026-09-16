@@ -5,10 +5,10 @@ Conditions can contribute to the Profile of another workload—for example, how
 an application's requirements can be included in the Profile of the development
 container used to build it.
 
-The composition solution has intentionally not been designed or implemented.
 The project brief in [`PROJECT-BRIEF.md`](PROJECT-BRIEF.md) describes the
 scenario, the open questions, and several possible directions without requiring
-a particular architecture.
+a particular architecture. This branch adds one deliberately small composition
+experiment so those questions can be tested against explicit artifacts.
 
 ## What is ready to use
 
@@ -18,11 +18,14 @@ a particular architecture.
 | `app/` | A tested web application plus a small content API |
 | `app/profile/conditions.go` | A declaration the existing Go profiler can discover |
 | `scripts/generate-application-profile.sh` | One profiling phase that emits `artifacts/application.profiler.yaml` |
+| `cmd/profile-compose/` | A small additive composer that preserves extension-defined Conditions as opaque YAML |
+| `scripts/compose-dev-container-profile.sh` | End-to-end profiling + composition helper |
+| `COMPOSITION-NOTES.md` | Design choices, non-goals, and questions exposed by the experiment |
 | `scripts/smoke-test.sh` | A real HTTP check of the target application |
 | `examples/` | Possible manual GA, wrapper, and composition inputs—not required formats |
 | `reference/` | Illustrations of possible application and dev-container outputs—not golden files |
 | sibling `extensions/` | Validating Google Analytics and source-control vocabulary |
-| `.github/workflows/dev-container-profile.yaml` | Independent foundation stages that a contributor can extend |
+| `.github/workflows/dev-container-profile.yaml` | Independent pipeline stages that pass real artifacts through profiling and composition |
 
 Google Analytics is represented manually for now. Discovering it automatically
 from application code is a possible later experiment, not a prerequisite.
@@ -72,10 +75,26 @@ go test ./...
 ./scripts/generate-application-profile.sh
 ```
 
-After those work, read [`PROJECT-BRIEF.md`](PROJECT-BRIEF.md) and choose the
-part of the pipeline you would like to explore first.
+Run the initial end-to-end composition experiment with:
 
-There is no single expected executable, package layout, intermediate format, or
-watching mechanism. A useful contribution may begin as a design note, a small
-pipeline stage, an experiment comparing representations, or a complete
-end-to-end demo.
+```sh
+sh ./scripts/compose-dev-container-profile.sh
+```
+
+That produces:
+
+```text
+artifacts/application.profiler.yaml
+artifacts/dev-container.profile.yaml
+artifacts/dev-container.provenance.yaml
+```
+
+The composer merges the profiler output, the manual application-owned Google
+Analytics Condition, and the wrapper-owned GitHub Condition. Extension URIs are
+de-duplicated exactly, duplicate Condition names fail rather than overwrite one
+another, and the target workload identity comes from the composition recipe.
+Composition provenance stays in a separate artifact so the materialized Profile
+remains an ordinary `RuntimeConditionsProfile`.
+
+Read [`COMPOSITION-NOTES.md`](COMPOSITION-NOTES.md) for the choices this pass
+makes deliberately and the questions it leaves open.
