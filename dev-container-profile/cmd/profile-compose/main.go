@@ -18,8 +18,7 @@ func main() {
 }
 
 func run() error {
-	applicationProfilePath := flag.String("application-profile", "artifacts/application.profiler.yaml", "application Runtime Conditions Profile")
-	applicationAdditionsPath := flag.String("application-additions", "examples/application.conditions.yaml", "application-owned Condition additions")
+	applicationProfilePath := flag.String("application-profile", "artifacts/application.profile.yaml", "completed application Runtime Conditions Profile")
 	wrapperAdditionsPath := flag.String("wrapper-additions", "examples/dev-container.conditions.yaml", "wrapper-owned Condition additions")
 	recipePath := flag.String("recipe", "examples/dev-container.compose.yaml", "composition recipe")
 	outPath := flag.String("out", "artifacts/dev-container.profile.yaml", "composed Runtime Conditions Profile output")
@@ -28,10 +27,6 @@ func run() error {
 
 	var application compose.Profile
 	if err := readYAML(*applicationProfilePath, &application); err != nil {
-		return err
-	}
-	var applicationAdditions compose.ConditionSet
-	if err := readYAML(*applicationAdditionsPath, &applicationAdditions); err != nil {
 		return err
 	}
 	var wrapperAdditions compose.ConditionSet
@@ -43,11 +38,10 @@ func run() error {
 		return err
 	}
 
-	profile, provenance, err := compose.Compose(application, applicationAdditions, wrapperAdditions, recipe, compose.SourcePaths{
-		ApplicationProfile:   *applicationProfilePath,
-		ApplicationAdditions: *applicationAdditionsPath,
-		WrapperAdditions:     *wrapperAdditionsPath,
-		Recipe:               *recipePath,
+	profile, provenance, err := compose.Compose(application, wrapperAdditions, recipe, compose.SourcePaths{
+		ApplicationProfile: *applicationProfilePath,
+		WrapperAdditions:   *wrapperAdditionsPath,
+		Recipe:             *recipePath,
 	})
 	if err != nil {
 		return err

@@ -53,10 +53,9 @@ type Recipe struct {
 }
 
 type SourcePaths struct {
-	ApplicationProfile   string
-	ApplicationAdditions string
-	WrapperAdditions     string
-	Recipe               string
+	ApplicationProfile string
+	WrapperAdditions   string
+	Recipe             string
 }
 
 type Provenance struct {
@@ -79,9 +78,45 @@ type ProvenanceSource struct {
 	Conditions []string `yaml:"conditions,omitempty"`
 }
 
-func Compose(application Profile, applicationAdditions, wrapperAdditions ConditionSet, recipe Recipe, paths SourcePaths) (Profile, Provenance, error) {
-	if application.APIVersion != RuntimeConditionsAPIVersion || application.Kind != RuntimeConditionsKind {
-		return Profile{}, Provenance{}, fmt.Errorf("application profile must be %s %s, got %q %q", RuntimeConditionsAPIVersion, RuntimeConditionsKind, application.APIVersion, application.Kind)
+// CompleteApplication materializes the application-owned view by combining the
+// profiler output with manually authored application requirements. The
+// application's workload identity is preserved and wrapper-owned requirements
+// are intentionally not accepted here.
+func CompleteApplication(application Profile, additions ConditionSet) (Profile, error) {
+	if err := validateProfileEnvelope(application, "application profile"); err != nil {
+		return Profile{}, err
+	}
+
+	out := Profile{
+		APIVersion: application.APIVersion,
+		Kind:       application.Kind,
+		Metadata:   cloneMetadata(application.Metadata),
+		Workload:   application.Workload,
+	}
+
+	seenExtensions := map[string]struct{}{}
+	var err error
+	out.Extensions, err = mergeExtensions(seenExtensions, out.Extensions, application.Extensions, additions.Extensions)
+	if err != nil {
+		return Profile{}, err
+	}
+
+	seenConditions := map[string]string{}
+	if _, err := appendConditions(&out.Conditions, seenConditions, "application-profile", application.Conditions); err != nil {
+		return Profile{}, err
+	}
+	if _, err := appendConditions(&out.Conditions, seenConditions, "application-additions", additions.Conditions); err != nil {
+		return Profile{}, err
+	}
+
+	return out, nil
+}
+
+// Compose materializes the dev-container view from an already completed
+// application Profile plus wrapper-owned requirements and a target recipe.
+func Compose(application Profile, wrapperAdditions ConditionSet, recipe Recipe, paths SourcePaths) (Profile, Provenance, error) {
+	if err := validateProfileEnvelope(application, "application profile"); err != nil {
+		return Profile{}, Provenance{}, err
 	}
 	if recipe.APIVersion != RecipeAPIVersion || recipe.Kind != RecipeKind {
 		return Profile{}, Provenance{}, fmt.Errorf("composition recipe must be %s %s, got %q %q", RecipeAPIVersion, RecipeKind, recipe.APIVersion, recipe.Kind)
@@ -93,8 +128,7 @@ func Compose(application Profile, applicationAdditions, wrapperAdditions Conditi
 		return Profile{}, Provenance{}, fmt.Errorf("composition target workload.uri is required")
 	}
 
-	metadata := recipe.Target.Metadata
-	metadata.Labels = cloneMap(metadata.Labels)
+	metadata := cloneMetadata(recipe.Target.Metadata)
 	if metadata.Labels == nil {
 		metadata.Labels = map[string]string{}
 	}
@@ -109,26 +143,17 @@ func Compose(application Profile, applicationAdditions, wrapperAdditions Conditi
 
 	seenExtensions := map[string]struct{}{}
 	var err error
-	out.Extensions, err = mergeExtensions(seenExtensions, out.Extensions, application.Extensions, applicationAdditions.Extensions, wrapperAdditions.Extensions)
+	out.Extensions, err = mergeExtensions(seenExtensions, out.Extensions, application.Extensions, wrapperAdditions.Extensions)
 	if err != nil {
 		return Profile{}, Provenance{}, err
 	}
 
 	seenConditions := map[string]string{}
-	sources := make([]ProvenanceSource, 0, 3)
+	sources := make([]ProvenanceSource, 0, 2)
 	appendSource := func(id, sourceType, path string, conditions []yaml.Node) error {
-		names := make([]string, 0, len(conditions))
-		for i := range conditions {
-			name, err := conditionName(&conditions[i])
-			if err != nil {
-				return fmt.Errorf("%s condition %d: %w", id, i+1, err)
-			}
-			if previous, exists := seenConditions[name]; exists {
-				return fmt.Errorf("condition name %q from %s collides with condition from %s", name, id, previous)
-			}
-			seenConditions[name] = id
-			out.Conditions = append(out.Conditions, conditions[i])
-			names = append(names, name)
+		names, err := appendConditions(&out.Conditions, seenConditions, id, conditions)
+		if err != nil {
+			return err
 		}
 		sources = append(sources, ProvenanceSource{
 			ID:         id,
@@ -140,9 +165,6 @@ func Compose(application Profile, applicationAdditions, wrapperAdditions Conditi
 	}
 
 	if err := appendSource("application-profile", "profile", paths.ApplicationProfile, application.Conditions); err != nil {
-		return Profile{}, Provenance{}, err
-	}
-	if err := appendSource("application-additions", "condition-set", paths.ApplicationAdditions, applicationAdditions.Conditions); err != nil {
 		return Profile{}, Provenance{}, err
 	}
 	if err := appendSource("wrapper-additions", "condition-set", paths.WrapperAdditions, wrapperAdditions.Conditions); err != nil {
@@ -163,6 +185,13 @@ func Compose(application Profile, applicationAdditions, wrapperAdditions Conditi
 	return out, provenance, nil
 }
 
+func validateProfileEnvelope(profile Profile, description string) error {
+	if profile.APIVersion != RuntimeConditionsAPIVersion || profile.Kind != RuntimeConditionsKind {
+		return fmt.Errorf("%s must be %s %s, got %q %q", description, RuntimeConditionsAPIVersion, RuntimeConditionsKind, profile.APIVersion, profile.Kind)
+	}
+	return nil
+}
+
 func mergeExtensions(seen map[string]struct{}, dst []string, groups ...[]string) ([]string, error) {
 	for _, group := range groups {
 		for _, extension := range group {
@@ -180,6 +209,23 @@ func mergeExtensions(seen map[string]struct{}, dst []string, groups ...[]string)
 	return dst, nil
 }
 
+func appendConditions(dst *[]yaml.Node, seen map[string]string, source string, conditions []yaml.Node) ([]string, error) {
+	names := make([]string, 0, len(conditions))
+	for i := range conditions {
+		name, err := conditionName(&conditions[i])
+		if err != nil {
+			return nil, fmt.Errorf("%s condition %d: %w", source, i+1, err)
+		}
+		if previous, exists := seen[name]; exists {
+			return nil, fmt.Errorf("condition name %q from %s collides with condition from %s", name, source, previous)
+		}
+		seen[name] = source
+		*dst = append(*dst, conditions[i])
+		names = append(names, name)
+	}
+	return names, nil
+}
+
 func conditionName(node *yaml.Node) (string, error) {
 	if node.Kind != yaml.MappingNode {
 		return "", fmt.Errorf("condition must be a mapping")
@@ -195,6 +241,14 @@ func conditionName(node *yaml.Node) (string, error) {
 		return name, nil
 	}
 	return "", fmt.Errorf("condition name is required")
+}
+
+func cloneMetadata(in Metadata) Metadata {
+	return Metadata{
+		Name:        in.Name,
+		Labels:      cloneMap(in.Labels),
+		Annotations: cloneMap(in.Annotations),
+	}
 }
 
 func cloneMap(in map[string]string) map[string]string {

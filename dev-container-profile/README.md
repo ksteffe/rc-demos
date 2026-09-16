@@ -17,15 +17,17 @@ experiment so those questions can be tested against explicit artifacts.
 | `.devcontainer/` | A Go 1.25 environment with the sibling repositories mounted together |
 | `app/` | A tested web application plus a small content API |
 | `app/profile/conditions.go` | A declaration the existing Go profiler can discover |
-| `scripts/generate-application-profile.sh` | One profiling phase that emits `artifacts/application.profiler.yaml` |
-| `cmd/profile-compose/` | A small additive composer that preserves extension-defined Conditions as opaque YAML |
-| `scripts/compose-dev-container-profile.sh` | End-to-end profiling + composition helper |
+| `scripts/generate-application-profile.sh` | Profiling phase that emits `artifacts/application.profiler.yaml` |
+| `cmd/profile-complete/` | Materializes the application-owned Profile from profiler output plus manual additions |
+| `cmd/profile-compose/` | Additive dev-container composer that preserves extension-defined Conditions as opaque YAML |
+| `cmd/profile-validate/` | Validates materialized Profiles against their declared extension schemas |
+| `scripts/compose-dev-container-profile.sh` | End-to-end profiling, completion, validation, and composition helper |
 | `COMPOSITION-NOTES.md` | Design choices, non-goals, and questions exposed by the experiment |
 | `scripts/smoke-test.sh` | A real HTTP check of the target application |
 | `examples/` | Possible manual GA, wrapper, and composition inputs—not required formats |
 | `reference/` | Illustrations of possible application and dev-container outputs—not golden files |
-| sibling `extensions/` | Validating Google Analytics and source-control vocabulary |
-| `.github/workflows/dev-container-profile.yaml` | Independent pipeline stages that pass real artifacts through profiling and composition |
+| sibling `extensions/` | Extension vocabulary and validation schemas used by the demo |
+| `.github/workflows/dev-container-profile.yaml` | Independent pipeline stages that pass real artifacts through profiling, completion, and composition |
 
 Google Analytics is represented manually for now. Discovering it automatically
 from application code is a possible later experiment, not a prerequisite.
@@ -75,24 +77,31 @@ go test ./...
 ./scripts/generate-application-profile.sh
 ```
 
-Run the initial end-to-end composition experiment with:
+Run the end-to-end composition experiment with:
 
 ```sh
 sh ./scripts/compose-dev-container-profile.sh
 ```
 
-That produces:
+That produces and validates:
 
 ```text
 artifacts/application.profiler.yaml
+artifacts/application.profile.yaml
 artifacts/dev-container.profile.yaml
 artifacts/dev-container.provenance.yaml
 ```
 
-The composer merges the profiler output, the manual application-owned Google
-Analytics Condition, and the wrapper-owned GitHub Condition. Extension URIs are
-de-duplicated exactly, duplicate Condition names fail rather than overwrite one
-another, and the target workload identity comes from the composition recipe.
+The profiler output is first completed with the manual application-owned Google
+Analytics Condition while preserving the application's workload identity. That
+standalone application Profile is validated against its declared extension
+schemas before it becomes an input to the dev-container composition phase.
+
+The dev-container composer then combines the completed application Profile with
+the wrapper-owned GitHub Condition and assigns the workload identity from the
+composition recipe. Extension URIs are de-duplicated exactly, duplicate
+Condition names fail rather than overwrite one another, and the finished
+dev-container Profile is validated before the pipeline publishes it.
 Composition provenance stays in a separate artifact so the materialized Profile
 remains an ordinary `RuntimeConditionsProfile`.
 

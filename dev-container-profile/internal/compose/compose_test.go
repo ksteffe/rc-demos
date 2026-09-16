@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestComposeBuildsTargetProfileAndProvenance(t *testing.T) {
+func TestCompleteApplicationBuildsApplicationOwnedProfile(t *testing.T) {
 	application := mustDecode[Profile](t, `
 apiVersion: runtimeconditions.io/v1alpha1
 kind: RuntimeConditionsProfile
@@ -27,10 +27,82 @@ conditions:
         - method: GET
           path: /message
 `)
-	applicationAdditions := mustDecode[ConditionSet](t, `
+	additions := mustDecode[ConditionSet](t, `
 extensions:
+  - https://example.test/extensions/common.yaml
   - https://example.test/extensions/analytics.yaml
 conditions:
+  - name: site-analytics
+    kind: google.analytics
+    interface:
+      type: web
+      events:
+        - page_view
+`)
+
+	profile, err := CompleteApplication(application, additions)
+	if err != nil {
+		t.Fatalf("CompleteApplication() error = %v", err)
+	}
+	if profile.Metadata.Name != "web-profile-demo" || profile.Workload.URI != "https://example.test/app" {
+		t.Fatalf("application identity changed: metadata=%q workload=%q", profile.Metadata.Name, profile.Workload.URI)
+	}
+	if len(profile.Extensions) != 2 {
+		t.Fatalf("extensions = %d, want 2", len(profile.Extensions))
+	}
+	if got := conditionNames(t, profile.Conditions); strings.Join(got, ",") != "content-api,site-analytics" {
+		t.Fatalf("conditions = %#v", got)
+	}
+}
+
+func TestCompleteApplicationRejectsConditionNameCollisions(t *testing.T) {
+	application := mustDecode[Profile](t, `
+apiVersion: runtimeconditions.io/v1alpha1
+kind: RuntimeConditionsProfile
+metadata:
+  name: app
+workload:
+  uri: https://example.test/app
+conditions:
+  - name: duplicated
+    kind: api
+    interface:
+      type: http
+`)
+	additions := mustDecode[ConditionSet](t, `
+conditions:
+  - name: duplicated
+    kind: google.analytics
+    interface:
+      type: web
+`)
+
+	_, err := CompleteApplication(application, additions)
+	if err == nil || !strings.Contains(err.Error(), "collides") {
+		t.Fatalf("CompleteApplication() error = %v, want collision error", err)
+	}
+}
+
+func TestComposeBuildsTargetProfileAndProvenance(t *testing.T) {
+	application := mustDecode[Profile](t, `
+apiVersion: runtimeconditions.io/v1alpha1
+kind: RuntimeConditionsProfile
+metadata:
+  name: web-profile-demo
+workload:
+  uri: https://example.test/app
+  version: demo
+extensions:
+  - https://example.test/extensions/common.yaml
+  - https://example.test/extensions/analytics.yaml
+conditions:
+  - name: content-api
+    kind: api
+    interface:
+      type: http
+      operations:
+        - method: GET
+          path: /message
   - name: site-analytics
     kind: google.analytics
     interface:
@@ -67,11 +139,10 @@ target:
     version: demo
 `)
 
-	profile, provenance, err := Compose(application, applicationAdditions, wrapperAdditions, recipe, SourcePaths{
-		ApplicationProfile:   "artifacts/application.profiler.yaml",
-		ApplicationAdditions: "examples/application.conditions.yaml",
-		WrapperAdditions:     "examples/dev-container.conditions.yaml",
-		Recipe:               "examples/dev-container.compose.yaml",
+	profile, provenance, err := Compose(application, wrapperAdditions, recipe, SourcePaths{
+		ApplicationProfile: "artifacts/application.profile.yaml",
+		WrapperAdditions:   "examples/dev-container.conditions.yaml",
+		Recipe:             "examples/dev-container.compose.yaml",
 	})
 	if err != nil {
 		t.Fatalf("Compose() error = %v", err)
@@ -86,28 +157,20 @@ target:
 	if len(profile.Extensions) != 3 {
 		t.Fatalf("extensions = %d, want 3", len(profile.Extensions))
 	}
-	if len(profile.Conditions) != 3 {
-		t.Fatalf("conditions = %d, want 3", len(profile.Conditions))
-	}
-
-	wantNames := []string{"content-api", "site-analytics", "application-source"}
-	for i := range profile.Conditions {
-		name, err := conditionName(&profile.Conditions[i])
-		if err != nil {
-			t.Fatalf("condition %d: %v", i, err)
-		}
-		if name != wantNames[i] {
-			t.Fatalf("condition %d name = %q, want %q", i, name, wantNames[i])
-		}
+	if got := conditionNames(t, profile.Conditions); strings.Join(got, ",") != "content-api,site-analytics,application-source" {
+		t.Fatalf("conditions = %#v", got)
 	}
 
 	if provenance.Kind != ProvenanceKind {
 		t.Fatalf("provenance kind = %q", provenance.Kind)
 	}
-	if len(provenance.Sources) != 3 {
-		t.Fatalf("provenance sources = %d, want 3", len(provenance.Sources))
+	if len(provenance.Sources) != 2 {
+		t.Fatalf("provenance sources = %d, want 2", len(provenance.Sources))
 	}
-	if got := provenance.Sources[2].Conditions; len(got) != 1 || got[0] != "application-source" {
+	if got := provenance.Sources[0].Conditions; strings.Join(got, ",") != "content-api,site-analytics" {
+		t.Fatalf("application provenance conditions = %#v", got)
+	}
+	if got := provenance.Sources[1].Conditions; len(got) != 1 || got[0] != "application-source" {
 		t.Fatalf("wrapper provenance conditions = %#v", got)
 	}
 }
@@ -126,12 +189,12 @@ conditions:
     interface:
       type: http
 `)
-	applicationAdditions := mustDecode[ConditionSet](t, `
+	wrapperAdditions := mustDecode[ConditionSet](t, `
 conditions:
   - name: duplicated
-    kind: google.analytics
+    kind: source_control
     interface:
-      type: web
+      type: git
 `)
 	recipe := mustDecode[Recipe](t, `
 apiVersion: tooling.runtimeconditions.io/v1alpha1
@@ -145,10 +208,23 @@ target:
     uri: https://example.test/app#dev-container
 `)
 
-	_, _, err := Compose(application, applicationAdditions, ConditionSet{}, recipe, SourcePaths{})
+	_, _, err := Compose(application, wrapperAdditions, recipe, SourcePaths{})
 	if err == nil || !strings.Contains(err.Error(), "collides") {
 		t.Fatalf("Compose() error = %v, want collision error", err)
 	}
+}
+
+func conditionNames(t *testing.T, conditions []yaml.Node) []string {
+	t.Helper()
+	names := make([]string, 0, len(conditions))
+	for i := range conditions {
+		name, err := conditionName(&conditions[i])
+		if err != nil {
+			t.Fatalf("condition %d: %v", i, err)
+		}
+		names = append(names, name)
+	}
+	return names
 }
 
 func mustDecode[T any](t *testing.T, input string) T {
