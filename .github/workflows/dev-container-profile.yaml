@@ -16,10 +16,8 @@ on:
 permissions:
   contents: read
 
-# These jobs prove only that the exploration environment is sound. They are
-# deliberately separate so a contributor can extend the workflow with logical
-# Condition extraction, composition, validation, and observation phases and
-# pass artifacts between them.
+# Keep the phases independent so their contracts remain visible and can be
+# passed between jobs as real artifacts.
 jobs:
   extensions:
     name: Validate extension vocabulary
@@ -41,8 +39,8 @@ jobs:
       - name: Validate Google Analytics and source-control extensions
         working-directory: go-rc-profiler
         run: |
-          go run . validate-extension -root ../extensions/google-analytics
-          go run . validate-extension -root ../extensions/source-control
+          go run . validate-extension -root ../extensions/catalog/google/analytics
+          go run . validate-extension -root ../extensions/catalog/rc/source-control
 
   application:
     name: Exercise the target application
@@ -56,11 +54,17 @@ jobs:
         with:
           repository: runtimeconditions/extensions
           path: extensions
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/go-rc-profiler
+          path: go-rc-profiler
       - uses: actions/setup-go@v7
         with:
           go-version-file: rc-demos/dev-container-profile/go.mod
-          cache-dependency-path: rc-demos/dev-container-profile/go.sum
-      - name: Run application tests
+          cache-dependency-path: |
+            rc-demos/dev-container-profile/go.sum
+            go-rc-profiler/go.sum
+      - name: Run application and composition tests
         working-directory: rc-demos/dev-container-profile
         run: go test ./...
       - name: Exercise the running web application
@@ -92,13 +96,117 @@ jobs:
           cache-dependency-path: |
             go-rc-profiler/go.sum
             rc-demos/dev-container-profile/go.sum
-      - name: Generate the application Profile
+      - name: Generate the application profiler output
         working-directory: rc-demos/dev-container-profile
         run: ./scripts/generate-application-profile.sh
-      - name: Retain the profiler output for later pipeline phases
+      - name: Retain the profiler output for application completion
         uses: actions/upload-artifact@v7
         with:
           name: application-profiler-output-${{ github.run_id }}
           path: rc-demos/dev-container-profile/artifacts/application.profiler.yaml
+          if-no-files-found: error
+          retention-days: 30
+
+  application-completion:
+    name: Complete and validate the application Profile
+    needs:
+      - application-profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: rc-demos
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/extensions
+          path: extensions
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/go-rc-profiler
+          path: go-rc-profiler
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: rc-demos/dev-container-profile/go.mod
+          cache-dependency-path: |
+            rc-demos/dev-container-profile/go.sum
+            go-rc-profiler/go.sum
+      - name: Restore the profiler output
+        uses: actions/download-artifact@v7
+        with:
+          name: application-profiler-output-${{ github.run_id }}
+          path: rc-demos/dev-container-profile/artifacts
+      - name: Materialize the completed application Profile
+        working-directory: rc-demos/dev-container-profile
+        run: |
+          go run ./cmd/profile-complete \
+            -application-profile artifacts/application.profiler.yaml \
+            -application-additions examples/application.conditions.yaml \
+            -out artifacts/application.profile.yaml
+      - name: Validate the completed application Profile
+        working-directory: rc-demos/dev-container-profile
+        run: |
+          go run ./cmd/profile-validate \
+            -profile artifacts/application.profile.yaml \
+            -extensions-root ../../extensions
+      - name: Retain the completed application Profile
+        uses: actions/upload-artifact@v7
+        with:
+          name: application-profile-${{ github.run_id }}
+          path: rc-demos/dev-container-profile/artifacts/application.profile.yaml
+          if-no-files-found: error
+          retention-days: 30
+
+  profile-composition:
+    name: Compose and validate the dev-container Profile
+    needs:
+      - application-completion
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: rc-demos
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/extensions
+          path: extensions
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/go-rc-profiler
+          path: go-rc-profiler
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: rc-demos/dev-container-profile/go.mod
+          cache-dependency-path: |
+            rc-demos/dev-container-profile/go.sum
+            go-rc-profiler/go.sum
+      - name: Restore the completed application Profile
+        uses: actions/download-artifact@v7
+        with:
+          name: application-profile-${{ github.run_id }}
+          path: rc-demos/dev-container-profile/artifacts
+      - name: Compose the dev-container Profile and provenance
+        working-directory: rc-demos/dev-container-profile
+        run: |
+          go run ./cmd/profile-compose \
+            -application-profile artifacts/application.profile.yaml \
+            -wrapper-additions examples/dev-container.conditions.yaml \
+            -recipe examples/dev-container.compose.yaml \
+            -out artifacts/dev-container.profile.yaml \
+            -provenance-out artifacts/dev-container.provenance.yaml
+      - name: Validate the dev-container Profile
+        working-directory: rc-demos/dev-container-profile
+        run: |
+          go run ./cmd/profile-validate \
+            -profile artifacts/dev-container.profile.yaml \
+            -extensions-root ../../extensions
+      - name: Retain composed artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dev-container-profile-composition-${{ github.run_id }}
+          path: |
+            rc-demos/dev-container-profile/artifacts/dev-container.profile.yaml
+            rc-demos/dev-container-profile/artifacts/dev-container.provenance.yaml
           if-no-files-found: error
           retention-days: 30
