@@ -1,0 +1,64 @@
+name: Portable Profile demo
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/portable-profile.yaml"
+      - "apps/request-logger-http/**"
+      - "apps/todos-api/**"
+      - "artifacts/**"
+      - "portable-profile/**"
+      - "kratix/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/portable-profile.yaml"
+      - "apps/request-logger-http/**"
+      - "apps/todos-api/**"
+      - "artifacts/**"
+      - "portable-profile/**"
+      - "kratix/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-profile:
+    name: Generate once, consume twice
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: rc-demos
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/extensions
+          path: extensions
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/go-rc-profiler
+          path: go-rc-profiler
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go-rc-profiler/go.mod
+          cache-dependency-path: |
+            go-rc-profiler/go.sum
+            rc-demos/portable-profile/go.sum
+      - name: Committed Profile matches application source
+        working-directory: rc-demos
+        run: portable-profile/scripts/generate-profile.sh --check
+      - name: Development consumer tests
+        working-directory: rc-demos/portable-profile
+        run: go test ./...
+      - name: Kratix resolver tests
+        working-directory: rc-demos/kratix/promises/application-release/pipeline
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet PyYAML==6.0.2
+          "$RUNNER_TEMP/venv/bin/python" -m unittest -v test_resolver
+      - name: Development demo reaches both dependencies
+        working-directory: rc-demos
+        run: portable-profile/scripts/run-dev.sh

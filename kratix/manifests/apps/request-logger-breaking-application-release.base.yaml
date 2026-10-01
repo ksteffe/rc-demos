@@ -1,0 +1,16 @@
+# spec.profile is materialized from artifacts/request-logger-http.profile.yaml
+# by kratix/scripts/materialize-application-release.sh.
+apiVersion: platform.demoteam.io/v1alpha1
+kind: ApplicationRelease
+metadata:
+  name: request-logger-breaking
+  namespace: demo
+spec:
+  image: ghcr.io/runtimeconditions/request-logger:latest
+  imagePullPolicy: Always
+  port: 8080
+  readinessPath: /ready
+  catalog:
+    configMapRef:
+      name: platform-api-catalog
+      namespace: platform-demo-system

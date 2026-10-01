@@ -3,9 +3,17 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST_DIR="$(cd "${SCRIPT_DIR}/../manifests" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PROFILE="${PROFILE:-${REPO_ROOT}/artifacts/request-logger-http.profile.yaml}"
+RELEASE="${REPO_ROOT}/kratix/generated/request-logger-application-release.yaml"
+
+"${SCRIPT_DIR}/materialize-application-release.sh" \
+  "${MANIFEST_DIR}/apps/request-logger-application-release.base.yaml" \
+  "${PROFILE}" \
+  "${RELEASE}"
 
 printf '[platform-demo] submitting ApplicationRelease request through Kratix\n'
-kubectl apply -f "${MANIFEST_DIR}/apps/request-logger-application-release.yaml"
+sed "s|^  imagePullPolicy: Always|  imagePullPolicy: ${IMAGE_PULL_POLICY:-Always}|" "${RELEASE}" | kubectl apply -f -
 
 printf '[platform-demo] waiting for ApplicationRelease configure workflow\n'
 kubectl -n demo wait applicationrelease/request-logger \

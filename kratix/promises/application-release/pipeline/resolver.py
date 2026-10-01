@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import ssl
 import sys
 import urllib.error
@@ -19,8 +18,49 @@ OUTPUT_DIR = Path(os.getenv("KRATIX_OUTPUT_DIR", "/kratix/output"))
 METADATA_DIR = Path(os.getenv("KRATIX_METADATA_DIR", "/kratix/metadata"))
 
 
+PROFILE_API_VERSION = "runtimeconditions.io/v1alpha1"
+PROFILE_KIND = "RuntimeConditionsProfile"
+
+API_PROPERTIES = {"baseUrl"}
+REDIS_PROPERTIES = {"url", "hostname", "port"}
+# In-cluster Redis is naturally addressed as a Service host and port.
+REDIS_PREFERRED_ALTERNATIVES = [{"hostname", "port"}]
+
+
 class ContractError(Exception):
     pass
+
+
+class ProfileError(Exception):
+    """spec.profile cannot be read as a Profile envelope.
+
+    This is a defensive check, not Runtime Conditions validation; the profiler
+    and extension schemas establish validity when the Profile is generated.
+    """
+
+
+@dataclass
+class UnsupportedCondition:
+    name: str
+    kind: str
+    reason: str
+
+
+class UnsupportedConditionError(Exception):
+    """Valid demand that this platform does not know how to fulfill."""
+
+    def __init__(self, conditions: list[UnsupportedCondition]):
+        self.conditions = conditions
+        super().__init__(
+            "\n".join(f"condition {c.name!r} (kind {c.kind!r}): {c.reason}" for c in conditions)
+        )
+
+
+@dataclass
+class SupportedCondition:
+    condition: dict[str, Any]
+    binding: str
+    env: list[tuple[str, str]]
 
 
 class NoAliasDumper(yaml.SafeDumper):
@@ -52,6 +92,21 @@ def main() -> int:
             }
         )
         return 0
+    except ProfileError as exc:
+        print(f"invalid Runtime Conditions Profile\n\n{exc}", file=sys.stderr)
+        write_status({"message": "Invalid Runtime Conditions Profile", "invalidProfile": str(exc)})
+        return 1
+    except UnsupportedConditionError as exc:
+        print(f"unsupported Runtime Conditions\n\n{exc}", file=sys.stderr)
+        write_status(
+            {
+                "message": "Unsupported Runtime Conditions",
+                "unsupportedConditions": [
+                    {"name": c.name, "kind": c.kind, "reason": c.reason} for c in exc.conditions
+                ],
+            }
+        )
+        return 1
     except ContractError as exc:
         message = f"API contract validation failed\n\n{exc}"
         print(message, file=sys.stderr)
@@ -80,8 +135,8 @@ def resolve(request: dict[str, Any]) -> OutputDocuments:
     image_pull_policy = spec.get("imagePullPolicy", "Always")
     readiness_path = spec.get("readinessPath", "/ready")
 
-    profile = yaml.safe_load(require_string(spec, "profile"))
-    conditions = profile.get("conditions") or []
+    conditions = read_profile_conditions(require_string(spec, "profile"))
+    supported = evaluate_support(conditions)
 
     catalog = load_catalog(spec.get("catalog", {}).get("configMapRef"))
     apis = parse_catalog_apis(catalog)
@@ -90,45 +145,43 @@ def resolve(request: dict[str, Any]) -> OutputDocuments:
     emitted: list[dict[str, Any]] = []
     summary: dict[str, Any] = {"apis": [], "caches": []}
 
-    for condition in conditions:
-        if condition.get("kind") != "api":
+    for item in supported:
+        if item.binding != "catalog-api":
             continue
+        condition = item.condition
         api = validate_api_condition(condition, apis)
-        env_name = api_url_env_name(condition.get("name") or api.name)
         base_url = api.base_url or f"http://{api.name}.{namespace}.svc.cluster.local:{port}"
-        env.append({"name": env_name, "value": base_url})
+        bound = bind_env(item.env, {"baseUrl": base_url})
+        env.extend(bound)
         summary["apis"].append(
             {
                 "condition": condition.get("name"),
                 "catalogApi": api.name,
-                "env": env_name,
+                "env": [var["name"] for var in bound],
                 "url": base_url,
             }
         )
 
     redis_cache_count = 0
-    for condition in conditions:
-        if condition.get("kind") != "cache":
+    for item in supported:
+        if item.binding != "redis":
             continue
-        interface = condition.get("interface") or {}
-        if interface.get("type") != "key_value" or interface.get("engine") != "redis":
-            continue
+        condition = item.condition
         redis_cache_count += 1
         redis_name = f"{name}-cache" if redis_cache_count == 1 else f"{name}-cache-{redis_cache_count}"
         emitted.append(redis_request(redis_name, namespace, name))
         redis_host = f"{redis_name}.{namespace}.svc.cluster.local"
-        env.extend(
-            [
-                {"name": "REDIS_URL", "value": f"redis://{redis_host}:6379"},
-                {"name": "REDIS_HOST", "value": redis_host},
-                {"name": "REDIS_PORT", "value": "6379"},
-            ]
+        bound = bind_env(
+            item.env,
+            {"url": f"redis://{redis_host}:6379", "hostname": redis_host, "port": "6379"},
         )
+        env.extend(bound)
         summary["caches"].append(
             {
                 "condition": condition.get("name"),
                 "resource": redis_name,
                 "engine": "redis",
+                "env": [var["name"] for var in bound],
             }
         )
 
@@ -139,6 +192,137 @@ def resolve(request: dict[str, Any]) -> OutputDocuments:
         ]
     )
     return OutputDocuments(emitted, summary)
+
+
+def read_profile_conditions(text: str) -> list[dict[str, Any]]:
+    try:
+        profile = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise ProfileError(f"spec.profile is not YAML: {exc}") from exc
+    if not isinstance(profile, dict):
+        raise ProfileError("spec.profile must be a mapping")
+
+    problems: list[str] = []
+    if profile.get("apiVersion") != PROFILE_API_VERSION:
+        problems.append(f"apiVersion is {profile.get('apiVersion')!r}, expected {PROFILE_API_VERSION!r}")
+    if profile.get("kind") != PROFILE_KIND:
+        problems.append(f"kind is {profile.get('kind')!r}, expected {PROFILE_KIND!r}")
+    conditions = profile.get("conditions") or []
+    if not isinstance(conditions, list):
+        problems.append("conditions must be a list")
+        conditions = []
+
+    seen: set[str] = set()
+    for index, condition in enumerate(conditions):
+        if not isinstance(condition, dict) or not condition.get("name") or not condition.get("kind"):
+            problems.append(f"conditions[{index}] must have a name and kind")
+            continue
+        if condition["name"] in seen:
+            problems.append(f"conditions[{index}]: duplicate condition name {condition['name']!r}")
+        seen.add(condition["name"])
+
+    if problems:
+        raise ProfileError("\n".join(problems))
+    return conditions
+
+
+def evaluate_support(conditions: list[dict[str, Any]]) -> list[SupportedCondition]:
+    """Account for every Condition before fulfilling any of them."""
+    supported: list[SupportedCondition] = []
+    unsupported: list[UnsupportedCondition] = []
+    for condition in conditions:
+        binding, provided, preferred, reason = support_for(condition)
+        env: list[tuple[str, str]] = []
+        if reason is None:
+            env, reason = select_env(condition, provided, preferred)
+        if reason is None:
+            supported.append(SupportedCondition(condition, binding, env))
+        else:
+            unsupported.append(UnsupportedCondition(condition["name"], condition["kind"], reason))
+    if unsupported:
+        raise UnsupportedConditionError(unsupported)
+    return supported
+
+
+def support_for(condition: dict[str, Any]) -> tuple[str, set[str], list[set[str]], str | None]:
+    """This platform's support table: binding, provided properties, preferences, or a reason."""
+    kind = condition["kind"]
+    interface = condition.get("interface") or {}
+    if kind == "api":
+        if interface.get("type") != "http":
+            return "", set(), [], f"no platform binding for API interface type {interface.get('type')!r}"
+        return "catalog-api", API_PROPERTIES, [], None
+    if kind == "cache":
+        if interface.get("type") != "key_value" or interface.get("engine") != "redis":
+            return (
+                "",
+                set(),
+                [],
+                f"no platform binding for cache type {interface.get('type')!r} engine {interface.get('engine')!r}",
+            )
+        return "redis", REDIS_PROPERTIES, REDIS_PREFERRED_ALTERNATIVES, None
+    return "", set(), [], f"no platform binding for condition kind {kind!r}"
+
+
+def select_env(
+    condition: dict[str, Any], provided: set[str], preferred: list[set[str]]
+) -> tuple[list[tuple[str, str]], str | None]:
+    """Choose the (env name, property) pairs to satisfy, or return why not.
+
+    For alternatives, exactly one complete alternative is chosen: the first
+    satisfiable one matching a platform preference, else the first satisfiable
+    one in declared order.
+    """
+    name = condition["name"]
+    configuration = condition.get("configuration")
+    if not configuration:
+        return [], "condition declares no configuration; this platform only supplies env configuration"
+    if not isinstance(configuration, dict):
+        raise ProfileError(f"condition {name!r}: configuration must be a mapping")
+    unknown = sorted(set(configuration) - {"env", "alternatives"})
+    if unknown:
+        return [], f"unsupported configuration form {unknown[0]!r}"
+    if len(configuration) > 1:
+        return [], "configuration declares both env and alternatives; this platform supports one form per condition"
+
+    if "env" in configuration:
+        entries = env_entries(name, "configuration.env", configuration["env"])
+        missing = [prop for _, prop in entries if prop not in provided]
+        if missing:
+            return [], f"platform binding does not provide property {missing[0]!r}"
+        return entries, None
+
+    alternatives = configuration["alternatives"]
+    if not isinstance(alternatives, list):
+        raise ProfileError(f"condition {name!r}: configuration.alternatives must be a list")
+    satisfiable: list[list[tuple[str, str]]] = []
+    for index, alternative in enumerate(alternatives):
+        raw = alternative.get("env") if isinstance(alternative, dict) else None
+        entries = env_entries(name, f"configuration.alternatives[{index}].env", raw)
+        if all(prop in provided for _, prop in entries):
+            satisfiable.append(entries)
+    if not satisfiable:
+        return [], f"platform binding provides {sorted(provided)} but no alternative is fully satisfiable"
+    for preference in preferred:
+        for entries in satisfiable:
+            if {prop for _, prop in entries} == preference:
+                return entries, None
+    return satisfiable[0], None
+
+
+def env_entries(condition_name: str, path: str, raw: Any) -> list[tuple[str, str]]:
+    if not isinstance(raw, list) or not raw:
+        raise ProfileError(f"condition {condition_name!r}: {path} must be a non-empty list")
+    entries: list[tuple[str, str]] = []
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, dict) or not entry.get("property") or not entry.get("name"):
+            raise ProfileError(f"condition {condition_name!r}: {path}[{index}] must have property and name")
+        entries.append((entry["name"], entry["property"]))
+    return entries
+
+
+def bind_env(entries: list[tuple[str, str]], values: dict[str, str]) -> list[dict[str, str]]:
+    return [{"name": env_name, "value": values[prop]} for env_name, prop in entries]
 
 
 def validate_api_condition(condition: dict[str, Any], apis: list[CatalogAPI]) -> CatalogAPI:
@@ -420,11 +604,6 @@ def workload_service(name: str, namespace: str, port: int) -> dict[str, Any]:
             "ports": [{"name": "http", "port": port, "targetPort": "http"}],
         },
     }
-
-
-def api_url_env_name(name: str) -> str:
-    normalized = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_").upper()
-    return f"{normalized}_URL"
 
 
 def require_string(mapping: dict[str, Any], key: str) -> str:
