@@ -10,7 +10,6 @@ import resolver
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 PROFILE = REPO_ROOT / "artifacts" / "request-logger-http.profile.yaml"
-BASE_MANIFEST = REPO_ROOT / "kratix" / "manifests" / "apps" / "request-logger-application-release.base.yaml"
 MATERIALIZE = REPO_ROOT / "kratix" / "scripts" / "materialize-application-release.sh"
 CATALOG = REPO_ROOT / "kratix" / "manifests" / "catalog" / "todos-api-catalog.yaml"
 BREAKING_CATALOG = REPO_ROOT / "kratix" / "manifests" / "catalog" / "todos-api-catalog-breaking.yaml"
@@ -30,10 +29,10 @@ class ResolverTestCase(unittest.TestCase):
         os.environ["RUNTIME_CONDITIONS_CATALOG_DIR"] = str(catalog_dir)
         self.addCleanup(os.environ.pop, "RUNTIME_CONDITIONS_CATALOG_DIR", None)
 
-    def materialized_release(self):
+    def materialized_release(self, name="request-logger"):
         output = Path(self.tmp.name) / "release.yaml"
         subprocess.run(
-            [str(MATERIALIZE), str(BASE_MANIFEST), str(PROFILE), str(output)],
+            [str(MATERIALIZE), name, str(PROFILE), str(output)],
             check=True,
             capture_output=True,
         )
@@ -59,6 +58,10 @@ class MaterializationTest(ResolverTestCase):
     def test_generated_profile_is_embedded_unchanged(self):
         release = self.materialized_release()
         self.assertEqual(release["spec"]["profile"], PROFILE.read_text())
+
+    def test_materialized_release_name_is_parameterized(self):
+        release = self.materialized_release("request-logger-breaking")
+        self.assertEqual(release["metadata"]["name"], "request-logger-breaking")
 
     def test_materialized_release_resolves_to_platform_resources(self):
         output = resolver.resolve(self.materialized_release())

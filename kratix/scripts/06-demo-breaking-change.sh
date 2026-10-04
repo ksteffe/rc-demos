@@ -11,7 +11,7 @@ printf '[platform-demo] publishing breaking API catalog bundle\n'
 kubectl apply -f "${MANIFEST_DIR}/catalog/todos-api-catalog-breaking.yaml"
 
 "${SCRIPT_DIR}/materialize-application-release.sh" \
-  "${MANIFEST_DIR}/apps/request-logger-breaking-application-release.base.yaml" \
+  "request-logger-breaking" \
   "${PROFILE}" \
   "${RELEASE}"
 

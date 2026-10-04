@@ -2,13 +2,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MANIFEST_DIR="$(cd "${SCRIPT_DIR}/../manifests" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROFILE="${PROFILE:-${REPO_ROOT}/artifacts/request-logger-http.profile.yaml}"
 RELEASE="${REPO_ROOT}/kratix/generated/request-logger-application-release.yaml"
 
 "${SCRIPT_DIR}/materialize-application-release.sh" \
-  "${MANIFEST_DIR}/apps/request-logger-application-release.base.yaml" \
+  "request-logger" \
   "${PROFILE}" \
   "${RELEASE}"
 
