@@ -9,7 +9,6 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 workspace_root=$(CDPATH= cd -- "$repo_root/.." && pwd)
 profiler_root=${PROFILER_ROOT:-"$workspace_root/go-rc-profiler"}
-extensions_root=${EXTENSIONS_ROOT:-"$workspace_root/extensions"}
 profile="$repo_root/artifacts/request-logger-http.profile.yaml"
 
 mode=${1:-generate}
@@ -21,7 +20,6 @@ trap 'rm -f "$generated" "$generated.raw"' EXIT
   cd "$profiler_root"
   go run . \
     -dir "$repo_root/apps/request-logger-http" \
-    -extensions-root "$extensions_root" \
     -name request-logger-http \
     -workload-uri github.com/runtimeconditions/rc-demos/apps/request-logger-http \
     -workload-version dev \
