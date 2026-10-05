@@ -1,8 +1,8 @@
 package main
 
 import (
-	common "github.com/runtimeconditions/extensions/common-integrations/go"
-	env "github.com/runtimeconditions/extensions/env-configuration/go"
+	common "github.com/runtimeconditions/extensions/catalog/rc/common-integrations/go"
+	env "github.com/runtimeconditions/extensions/catalog/rc/env-configuration/go"
 )
 
 func declaration() {

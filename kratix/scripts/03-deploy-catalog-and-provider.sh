@@ -8,7 +8,7 @@ printf '[platform-demo] publishing compatible API catalog bundle\n'
 kubectl apply -f "${MANIFEST_DIR}/catalog/todos-api-catalog.yaml"
 
 printf '[platform-demo] deploying provider API\n'
-kubectl apply -f "${MANIFEST_DIR}/apps/todos-api.yaml"
+sed "s|imagePullPolicy: Always|imagePullPolicy: ${IMAGE_PULL_POLICY:-Always}|" "${MANIFEST_DIR}/apps/todos-api.yaml" | kubectl apply -f -
 kubectl -n demo rollout status deployment/todos-api --timeout=180s
 
 printf '[platform-demo] provider API is available\n'
