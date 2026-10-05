@@ -1,0 +1,72 @@
+name: Validated Profile handoff experiment
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/validated-profile-handoff.yaml"
+      - "validated-profile-handoff/**"
+      - "portable-profile/**"
+      - "apps/request-logger-http/**"
+      - "artifacts/**"
+  push:
+    branches: [main, experiment/validated-profile-handoff]
+    paths:
+      - ".github/workflows/validated-profile-handoff.yaml"
+      - "validated-profile-handoff/**"
+      - "portable-profile/**"
+      - "apps/request-logger-http/**"
+      - "artifacts/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: rc-demos
+      # Pin the validator/catalog inspected for this experiment. Existing
+      # portable-profile CI remains unchanged and continues tracking upstream.
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/extensions
+          ref: 1f24b8815812f8a883cf7ceb87b6a9810d47e106
+          path: extensions
+      - uses: actions/checkout@v7
+        with:
+          repository: runtimeconditions/go-rc-profiler
+          ref: 5d2e860e48842b89ec83414123a7e59228f61d36
+          path: go-rc-profiler
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go-rc-profiler/go.mod
+          cache-dependency-path: |
+            go-rc-profiler/go.sum
+            rc-demos/portable-profile/go.sum
+            rc-demos/validated-profile-handoff/go.sum
+      - name: Existing consumer and workload tests
+        working-directory: rc-demos
+        run: |
+          (cd portable-profile && go test ./...)
+          (cd apps/request-logger-http && go test ./...)
+      - name: Acceptance cases and validator-free consumer boundary
+        working-directory: rc-demos/validated-profile-handoff
+        run: go test -v ./...
+      - name: Generate, validate, verify, and consume
+        working-directory: rc-demos
+        run: validated-profile-handoff/scripts/run.sh
+      - name: Inspectable bundles and outcomes (no signing key)
+        uses: actions/upload-artifact@v4
+        with:
+          name: validated-profile-handoff
+          path: |
+            rc-demos/validated-profile-handoff/generated/run.*/valid/
+            rc-demos/validated-profile-handoff/generated/run.*/unsupported/
+            rc-demos/validated-profile-handoff/generated/run.*/*-result.json
+            rc-demos/validated-profile-handoff/generated/run.*/trusted.pub
+            rc-demos/validated-profile-handoff/generated/run.*/request-logger.env
+          if-no-files-found: error
