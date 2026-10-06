@@ -27,7 +27,10 @@ def promise():
         },
     }
     pipeline = doc["spec"]["workflows"]["resource"]["configure"][0]
-    pipeline["metadata"]["name"] = "verified-resolve"
+    # Kratix includes the pipeline name in generated ServiceAccount names and
+    # limits the resulting name to 60 characters. Keep this short enough for
+    # validated-application-release resource workflows.
+    pipeline["metadata"]["name"] = "resolve"
     pipeline["spec"].update({
         "restartPolicy": "Never", "jobOptions": {"backoffLimit": 0},
         "volumes": [
