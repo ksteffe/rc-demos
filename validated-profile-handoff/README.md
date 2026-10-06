@@ -16,6 +16,12 @@ statuses here are deliberately experimental. This is implementation evidence,
 not a proposal for a standardized validation-record format or a new Runtime
 Conditions resource type. The Profile schema is unchanged.
 
+The primary platform demonstration is now the
+[Kratix workflow](kratix/README.md): verification runs as the first Promise
+workflow init container, before the existing deployment resolver. A separate
+KinD CI job submits all five cases and checks real Pod execution and emitted
+Work. The local development runner below remains a fast test harness.
+
 ```text
 request-logger source declarations
         |
@@ -250,7 +256,8 @@ unchanged and continues testing the live development demo and Kratix resolver.
 This does not compare trust mechanisms, establish the smallest possible evidence
 format, standardize validation levels, or prove all consumers need this boundary.
 The recorded API calls describe this implementation, not normative RC levels.
-It does not integrate the handoff into Kratix or couple it to any deployment
-mechanism. Extension-resolution reporting could eventually remove the need for
+The verifier is now exercised by both the local development wrapper and an
+opt-in Kratix Promise; neither integration changes the RC Profile schema.
+Extension-resolution reporting could eventually remove the need for
 the producer's local snapshot/index code; whether that belongs upstream is an
 open implementation question.
