@@ -124,17 +124,18 @@ func TestCatalogRejectsMissingDependencyInvalidAndConflictingDocuments(t *testin
 	}
 }
 
-// Keep the upstream incompatibility executable, rather than deleting version
-// annotations or rewriting the generated Profile to hide it. The original
-// acceptance suite still requires a successful real published-path handoff.
-func TestV060CatalogAPIIdentityIncompatibility(t *testing.T) {
+// Rehearse the candidate upstream fix against unchanged publication bytes.
+func TestCandidateCatalogAPIResolvesPublishedIdentity(t *testing.T) {
 	snapshot := t.TempDir()
 	if _, err := snapshotWithLoader([]string{envID}, resolver.NewInMemoryLoader(publishedFixtures(t)), snapshot); err != nil {
 		t.Fatal(err)
 	}
-	_, err := extensioncheck.ResolveExtensionClosure([]extensioncheck.ExtensionReference{{ID: envID}}, extensioncheck.ProfileOptions{CatalogRoots: []string{snapshot}})
-	if err == nil || !strings.Contains(err.Error(), "missing extension definition") {
-		t.Fatalf("expected released identity mismatch, got %v", err)
+	closure, err := extensioncheck.ResolveExtensionClosure([]extensioncheck.ExtensionReference{{ID: envID}}, extensioncheck.ProfileOptions{CatalogRoots: []string{snapshot}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(closure) != 2 || closure[0].ID != commonID || closure[1].ID != envID {
+		t.Fatalf("unexpected closure: %#v", closure)
 	}
 }
 
@@ -143,6 +144,7 @@ func TestFailedPublishedValidationNeverReturnsSignedArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	profile = bytes.ReplaceAll(profile, []byte("engine: redis"), []byte("engine: invalid"))
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)

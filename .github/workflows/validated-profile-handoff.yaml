@@ -10,7 +10,7 @@ on:
       - "artifacts/**"
       - "kratix/**"
   push:
-    branches: [main, chore/published-rc-dependencies]
+    branches: [main, chore/published-rc-dependencies, test/published-catalog-candidate]
     paths:
       - ".github/workflows/validated-profile-handoff.yaml"
       - "validated-profile-handoff/**"

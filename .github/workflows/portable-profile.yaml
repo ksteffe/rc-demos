@@ -13,6 +13,7 @@ on:
     branches:
       - main
       - chore/published-rc-dependencies
+      - test/published-catalog-candidate
     paths:
       - ".github/workflows/portable-profile.yaml"
       - "apps/request-logger-http/**"
