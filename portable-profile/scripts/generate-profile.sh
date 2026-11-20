@@ -7,7 +7,7 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
-profiler=$("$script_dir/install-profiler.sh")
+rc=${RC_CLI:-$(sh "$script_dir/install-rc.sh")}
 profile="$repo_root/artifacts/request-logger-http.profile.yaml"
 
 mode=${1:-generate}
@@ -16,12 +16,12 @@ generated=$(mktemp)
 trap 'rm -f "$generated" "$generated.raw"' EXIT
 
 go -C "$repo_root/apps/request-logger-http" mod download
-"$profiler" generate \
-  -dir "$repo_root/apps/request-logger-http" \
-  -name request-logger-http \
-  -workload-uri github.com/runtimeconditions/rc-demos/apps/request-logger-http \
-  -workload-version dev \
-  -out "$generated.raw"
+"$rc" profile generate \
+  --dir "$repo_root/apps/request-logger-http" \
+  --name request-logger-http \
+  --workload-uri github.com/runtimeconditions/rc-demos/apps/request-logger-http \
+  --workload-version dev \
+  --out "$generated.raw"
 
 {
   echo "# Generated from apps/request-logger-http by portable-profile/scripts/generate-profile.sh."
