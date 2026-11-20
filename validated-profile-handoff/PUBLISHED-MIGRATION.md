@@ -1,110 +1,73 @@
-# Published distribution migration: blocked at strict validation
+# Published distribution migration: official rc-cli validation
 
-This branch follows [merged PR #5](https://github.com/runtimeconditions/rc-demos/pull/5)
-and [Colin's follow-up](https://github.com/runtimeconditions/rc-demos/pull/5#pullrequestreview-5595539492)
-about released Go tooling and catalog publication. It is a
-**draft**, not evidence that the published-path handoff acceptance contract passes.
-No upstream repositories are modified and no validation check is bypassed.
+This branch follows merged
+[rc-demos PR #5](https://github.com/runtimeconditions/rc-demos/pull/5)
+and Colin's feedback about published tool and catalog usage.
 
-## Compatibility finding
+## Implementation (2026-11-19)
 
-The official profiler v0.6.0 binary successfully generates the committed Profile
-from `runtimeconditions.io/x/rc/common@v0.1.0` and `runtimeconditions.io/x/rc/env@v0.1.0`.
-Its embedded core schema is 0.4.0. The HTTP contract, response schema, Redis engine,
-and the two environment alternatives remain the same. Serialization order changes,
-extensions become complete definition URLs, and optional Condition names disappear.
-Consumers accept missing names with positional diagnostic labels; explicit invalid
-names remain errors. Generated output is not rewritten to add names or change IDs.
+The official [rc-cli v0.6.0 release](https://github.com/runtimeconditions/rc-cli/releases/tag/v0.6.0)
+(published November 18, 2026) embeds the Go profiler **v0.8.0**
+and core schema **0.4.0**. The repository installs that CLI from its pinned
+release archives, checking the published SHA-256 on every invocation. Local
+Homebrew/apt/dnf installs are supported for exploration but not used as a
+floating CI dependency.
 
-The genuine HTTPS catalog returns definitions whose `metadata.id` is that same
-complete URL and whose `metadata.version` is the `v1alpha1` annotation. Their
-dependencies use the complete URL directly. The current `EXTENSION_RELEASES.md`
-also describes an older `<uri>:<version>` publication convention; the actual
-published binding resources and HTTPS responses agree on the complete URL IDs.
-This demo uses those actual identifiers, without guessing alternate routes.
+`portable-profile/scripts/generate-profile.sh` now executes
+`rc profile generate`. The new CLI's canonical serialization writes
+`https://runtimeconditions.io/extensions/common-integrations:v1alpha1`
+and `https://runtimeconditions.io/extensions/env-configuration:v1alpha1`
+as short, versioned references. The committed Profile is regenerated in that
+format, with its original bytes handed to consumers unchanged.
 
-The released profiler's **catalog** API instead indexes definitions by
-`ExtensionReference{ID: metadata.id, Version: metadata.version}`. It parses a
-complete Profile/dependency URL as `ExtensionReference{ID: url, Version: ""}`.
-Therefore both `ResolveExtensionClosure` and `ValidateProfileYAML` fail to find
-the published definition, despite successful HTTP retrieval. This differs from
-the installed-generated-binding path used by the executable.
+The trusted producer expands those short references into complete HTTPS
+definition URLs **for resolution and evidence identity only**. It captures
+every retrieved definition once, including dependencies, and writes the exact
+response bytes to a private snapshot. It then invokes
+`rc profile validate - --catalog <snapshot>`, passing the unmodified Profile
+through stdin. This is the independently implemented CLI validator—not
+`go-rc-profiler/extensioncheck`—and it correctly matches complete definition
+IDs with optional `metadata.version` annotations. `--catalog` forbids
+additional live fetches during validation.
 
-The upstream generic resolver can retrieve and traverse these definitions, but
-its merge/Condition validator is not an equivalent replacement for the profiler's
-strict vocabulary and definition validation: it intentionally permits ambiguous
-kind fallback and has a different validation surface. Substituting it alone would
-weaken the original acceptance contract. The producer therefore retains the two
-mandatory profiler checks and refuses to sign.
+Only a successful CLI validation allows the producer to sign evidence.
+The signature covers the exact Profile digest, full extension ID/digests,
+validator identity and executable SHA-256, and producer identity. The
+downstream consumer still links no RC semantic validator and still performs
+support evaluation only after signature and byte-digest verification.
 
-Stripping `metadata.version`, appending versions to generated IDs, validating
-rewritten definitions, or signing the original bytes after validating transformed
-ones would conceal the mismatch or invalidate the exact-snapshot claim. None of
-those workarounds is used here.
+No unmerged upstream Go profiler patch, local checkout substitution, modified
+published definitions, or rewritten Profile artifact is required.
 
-## Reproduce without sibling checkouts
+## Remaining publication blocker
+
+GitHub Actions on November 19, 2026 returned **HTTP 404** from
+`https://runtimeconditions.io/extensions/common-integrations/v1alpha1/runtimeconditions.extension.yaml`
+and the corresponding published catalog route could not be used for the
+required live HTTPS acceptance. This occurs during snapshot retrieval,
+before the CLI gets to validate. Local captured-publication fixtures are
+useful for testing the new CLI's compatibility, but **do not establish**
+that the upstream catalog is live or that the five live handoff cases pass.
+
+Do not replace those URLs with invented aliases or silently fall back to
+local copies. The required next step is to restore the official published
+definition URLs (or adopt newly published authoritative identifiers through
+the bindings, if that is the upstream direction), then rerun all five live
+acceptance cases and real KinD/Kratix. Keep failures visible and the PR open.
+
+## Reproduce
 
 ```sh
+export RC_CLI="$(sh portable-profile/scripts/install-rc.sh)"
 portable-profile/scripts/generate-profile.sh --check
 (cd validated-profile-handoff && go test -v ./internal/producer)
 (cd validated-profile-handoff && go test -v ./...)
 validated-profile-handoff/scripts/run.sh
 ```
 
-The producer unit tests pass, including a deterministic reproducer using exact
-captured publication bytes. The complete acceptance suite and runner fail at
-upstream resolution with `missing extension definition ...yaml@` (empty version).
-All five end-to-end cases are still enabled; they cannot reach consumer assertions
-because their real producer setup fails. Python platform adapter preparation has
-the same blocker. This is not a successful five-case acceptance run.
-
-## Unified CLI distribution update (2026-11-19)
-
-Runtime Conditions now provides `rc-cli` through Homebrew, apt, and dnf/yum.
-The latest published `rc-cli` release checked for this update is **v0.6.0**
-(published November 18, 2026). Its
-[`components.lock.yaml`](https://github.com/runtimeconditions/rc-cli/blob/v0.6.0/distribution/components.lock.yaml)
-pins the **Go profiler v0.8.0** with core schema **0.4.0**. This is a different
-version coordinate from the **standalone go-rc-profiler v0.6.0** used by this
-branch's generation script and producer module. Do not conflate the two
-`v0.6.0` release numbers.
-
-The packaged `rc` executable exposes `rc profile generate`, `rc profile
-validate`, and `rc plugins list`. It is a better user-facing way to explore
-these demos and makes a source build unnecessary for ordinary local use.
-However, **installation is not a fix for the catalog identity mismatch**:
-the upstream [go-rc-profiler fix PR #2](https://github.com/runtimeconditions/go-rc-profiler/pull/2)
-remains open, and the released v0.8.0 source still parses bare full definition
-URLs with an empty `ExtensionReference.Version`. No successful end-to-end
-handoff validation under the newer packaged CLI has been established here.
-
-In addition, `rc profile validate <file>` by itself may fetch definitions
-directly from their URLs. It is not interchangeable with this producer's
-requirement to validate against its **private snapshot of exact retrieved
-definition bytes**, sign their digests, and leave the downstream verifier free
-of Runtime Conditions validator dependencies. Package-manager installs may
-also advance to new versions, so they must not silently replace the currently
-pinned release binary in reproducibility-sensitive CI.
-
-A future compatibility upgrade should evaluate the released fix, independently
-pin the CLI and profiler component versions/checksums, regenerate and diff the
-Profile, preserve the producer's exact-snapshot and fail-closed properties, and
-rerun **all five** acceptance cases plus real KinD/Kratix integration. Until
-then, the existing blocker and current test expectations remain unchanged.
-
-## Required next step
-
-A corrected upstream profiler release needs catalog identity handling consistent
-with its generated-binding path, treating `metadata.version` as an annotation for
-complete definition URI identities. After such a release is available, update the
-module and CLI archive pins, remove/update the incompatibility reproducer, and
-rerun every acceptance case and the genuine KinD/Kratix job. No upstream change
-is made as part of this rc-demos task.
-
-The generic resolver is pinned at
-`v0.0.0-20261005083147-3cc942274975` because it has no published version tags.
-It requires Go 1.27, so CI uses Go 1.27.3. Its graph traversal is used upstream
-only. The downstream verifier does not import either resolver or validator.
+The offline producer regression uses the committed, unmodified published
+definition fixtures. Required acceptance and Kratix runs use HTTPS by
+default and must not claim success when publication is unavailable.
 
 ## Validation evidence and limitations
 
@@ -131,7 +94,7 @@ replay, publisher, and deployment limitations remain.
 - Five changed/new shell scripts pass syntax checks; both workflow YAML files
   parse and retain `contents: read`. ShellCheck is not installed locally.
 - Full handoff Go acceptance suite, Python platform adapter setup, and the real
-  runner fail at the released catalog identity mismatch described above.
+  runner fail at the published definition HTTP 404 described above.
 - Docker, KinD, and kubectl are unavailable locally. The cluster job is retained
   in CI and depends on the handoff job; it cannot run successfully until the
   producer blocker is fixed. No cluster acceptance pass is claimed.
