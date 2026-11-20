@@ -1,16 +1,21 @@
-// Package producer is the trusted, upstream side of this experiment. Only this
-// package imports the RC validator. No signing occurs until both upstream calls
-// succeed against private snapshots of the exact bytes recorded in evidence.
+// Package producer is the trusted, upstream side of this experiment. It
+// executes the official rc CLI over an exact, private extension snapshot.
+// No signing occurs until the CLI accepts those exact bytes.
 package producer
 
 import (
+	"bytes"
+	"context"
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
+	"strings"
+	"time"
 
-	"github.com/runtimeconditions/go-rc-profiler/extensioncheck"
 	"github.com/runtimeconditions/rc-demos/validated-profile-handoff/handoff"
 )
 
@@ -37,37 +42,50 @@ func Validate(profile []byte, catalog string, key ed25519.PrivateKey, producerDi
 	if err != nil {
 		return nil, fmt.Errorf("extension resolution: %w", err)
 	}
-	refs := make([]extensioncheck.ExtensionReference, len(ids))
-	for i, id := range ids {
-		refs[i] = extensioncheck.ExtensionReference{ID: id}
+
+	// The snapshot contains exactly the transitive published closure, captured
+	// once before validation. rc's --catalog mode is offline: it validates these
+	// same definition bytes, never a second live download.
+	rcPath := os.Getenv("RC_CLI")
+	if rcPath == "" {
+		rcPath, err = exec.LookPath("rc")
+		if err != nil {
+			return nil, fmt.Errorf("rc-cli is required (install it or set RC_CLI): %w", err)
+		}
 	}
-	closure, err := extensioncheck.ResolveExtensionClosure(refs, extensioncheck.ProfileOptions{CatalogRoots: []string{snapshot}})
+	validatorBytes, err := os.ReadFile(rcPath)
 	if err != nil {
-		return nil, fmt.Errorf("extension resolution: %w", err)
+		return nil, fmt.Errorf("read rc-cli executable: %w", err)
 	}
-	// Validate against only the closure that will cross the boundary. Other catalog
-	// entries cannot accidentally contribute vocabulary without being evidenced.
-	resolved, err := os.MkdirTemp("", "validation-resolved-")
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, rcPath, "profile", "validate", "-", "--catalog", snapshot)
+	command.Stdin = bytes.NewReader(profile)
+	output, err := command.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("upstream Profile validation via rc-cli failed: %w: %s", err, strings.TrimSpace(string(output)))
 	}
-	defer os.RemoveAll(resolved)
-	evidence := handoff.Evidence{Format: handoff.Format, ProfileSHA256: handoff.Digest(profile), Validator: handoff.Validator, ProducerSHA256: producerDigest, Steps: append([]string(nil), handoff.Steps...), Extensions: []handoff.Extension{}}
+	if !strings.Contains(string(output), "runtimeconditions: profile validated") {
+		return nil, fmt.Errorf("rc-cli did not confirm profile validation: %s", strings.TrimSpace(string(output)))
+	}
+
+	evidence := handoff.Evidence{
+		Format: handoff.Format, ProfileSHA256: handoff.Digest(profile),
+		Validator: handoff.Validator, ValidatorSHA256: handoff.Digest(validatorBytes),
+		ProducerSHA256: producerDigest, Steps: append([]string(nil), handoff.Steps...),
+		Extensions: []handoff.Extension{},
+	}
 	artifacts := &Artifacts{Profile: profile, Extensions: map[string][]byte{}}
-	for _, id := range closure {
-		data, exists := definitions[id.ID]
-		if !exists {
-			return nil, fmt.Errorf("resolved definition unavailable: %s", id)
-		}
-		digest := handoff.Digest(data)
-		if err := os.WriteFile(filepath.Join(resolved, digest+".yaml"), data, 0600); err != nil {
-			return nil, err
-		}
-		evidence.Extensions = append(evidence.Extensions, handoff.Extension{ID: id.ID, SHA256: digest})
-		artifacts.Extensions[digest] = data
+	orderedIDs := make([]string, 0, len(definitions))
+	for id := range definitions {
+		orderedIDs = append(orderedIDs, id)
 	}
-	if err := extensioncheck.ValidateProfileYAML(profile, extensioncheck.ProfileOptions{CatalogRoots: []string{resolved}}); err != nil {
-		return nil, fmt.Errorf("upstream Profile validation: %w", err)
+	sort.Strings(orderedIDs)
+	for _, id := range orderedIDs {
+		data := definitions[id]
+		digest := handoff.Digest(data)
+		evidence.Extensions = append(evidence.Extensions, handoff.Extension{ID: id, SHA256: digest})
+		artifacts.Extensions[digest] = data
 	}
 	artifacts.Evidence, err = json.MarshalIndent(evidence, "", "  ")
 	if err != nil {
