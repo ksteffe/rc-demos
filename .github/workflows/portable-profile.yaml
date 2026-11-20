@@ -40,6 +40,11 @@ jobs:
           cache-dependency-path: |
             rc-demos/apps/request-logger-http/go.sum
             rc-demos/portable-profile/go.sum
+      - name: Install pinned rc-cli
+        working-directory: rc-demos
+        run: |
+          rc_path="$(sh portable-profile/scripts/install-rc.sh)"
+          echo "RC_CLI=$rc_path" >> "$GITHUB_ENV"
       - name: Committed Profile matches application source
         working-directory: rc-demos
         run: portable-profile/scripts/generate-profile.sh --check
