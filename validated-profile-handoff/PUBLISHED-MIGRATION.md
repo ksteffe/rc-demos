@@ -71,32 +71,32 @@ default and must not claim success when publication is unavailable.
 
 ## Validation evidence and limitations
 
-The original evidence format and signing flow are unchanged. Evidence covers the
-exact Profile bytes (including the generated header) and SHA-256 digests of every
-resolved extension response; the signature covers the exact JSON evidence bytes.
-Complete bundles are atomically renamed into place only after strict validation;
-keys remain outside published output. Unavailable resources, invalid definitions,
-conflicts, and validation errors produce no signed artifacts and no fallback.
+The experimental evidence format now additionally records the `rc` validator
+executable SHA-256. It continues to bind the **exact** Profile bytes, complete
+published-definition IDs and exact byte digests, producer identity, and
+successful validation step list; Ed25519 signs the whole JSON evidence byte
+sequence. Complete bundles are atomically renamed into place only after
+validation, with signing keys kept outside published output.
 
-This remains experimental implementation evidence, not a proposed standardized
-evidence format or production-grade signing infrastructure. The original trust,
-replay, publisher, and deployment limitations remain.
+This is experimental implementation evidence, not a standardized evidence
+format or production-grade signing infrastructure. A signature authenticates
+the configured producer key, not execution attestation.
 
-## Local verification (2026-10-21)
+## Verification (2026-11-19)
 
-- Workload Go tests, portable consumer Go tests, and Profile drift check pass.
-- Producer catalog tests pass (HTTP fixture failures, closure, exact bytes,
-  conflicts/cycles, response limits, explicit HTTPS policy, and the incompatibility
-  reproducer). The consumer dependency boundary test passes.
-- Existing Python ApplicationRelease resolver suite: 24 tests pass, including
-  canonical Redis/Deployment/Service output and optional-name handling.
-- Go vet passes for the workload, portable consumer, and handoff module.
-- Five changed/new shell scripts pass syntax checks; both workflow YAML files
-  parse and retain `contents: read`. ShellCheck is not installed locally.
-- Full handoff Go acceptance suite, Python platform adapter setup, and the real
-  runner fail at the published definition HTTP 404 described above.
-- Docker, KinD, and kubectl are unavailable locally. The cluster job is retained
-  in CI and depends on the handoff job; it cannot run successfully until the
-  producer blocker is fixed. No cluster acceptance pass is claimed.
-- The live development demo also needs Redis or Docker, unavailable locally;
-  its existing CI step is retained.
+- Official `rc-cli` v0.6.0 installs from a checksum-verified release archive.
+- The Profile drift check and entire Portable Profile CI pipeline pass with
+  `rc profile generate` and the newly committed short references.
+- The original two published-definition fixtures, including their
+  `metadata.version` annotations, **pass** the independent
+  `rc profile validate --catalog` regression test. Invalid demand fails
+  without producing signed artifacts.
+- All five handoff scenarios pass in the separate **offline published-fixture
+  acceptance** CI job. This proves the CLI/handoff integration without claiming
+  the live publisher is healthy.
+- Live published-path acceptance continues to fail closed at HTTP 404 for the
+  declared extension-definition URL; the dependent real KinD/Kratix job is
+  skipped. No live five-case or cluster acceptance pass is claimed.
+- The downstream consumer remains validator-free. The old standalone
+  go-rc-profiler library and installer are removed from the handoff/generation
+  dependency paths.
