@@ -94,6 +94,15 @@ The validated handoff migration is currently blocked by a separate released
 catalog-validation identity mismatch; see
 [the compatibility report](../validated-profile-handoff/PUBLISHED-MIGRATION.md).
 
+The unified `rc` CLI is now available from Homebrew and Linux package
+repositories (CLI v0.6.0, November 18, 2026). Developers can explore
+`rc plugins list`, `rc profile generate`, and `rc profile validate` with
+that install. This experiment deliberately continues to use the checksum-pinned
+standalone profiler v0.6.0 for its committed Profile: the packaged CLI embeds
+a different Go profiler (v0.8.0). Replacing the generator requires confirming
+byte-for-byte Profile drift behavior, version/schema compatibility, and all
+handoff acceptance cases; package availability alone does not establish those.
+
 1. Generate the Profile, or confirm the committed copy matches source:
 
    ```sh
