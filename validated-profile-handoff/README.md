@@ -1,10 +1,11 @@
 # Validated Profile handoff
 
-> **Draft migration: not ready to merge.** The published-path producer currently
-> fails closed in profiler v0.6.0's catalog API. The original five acceptance cases
-> remain enabled and fail during upstream setup; they have not passed on this
-> branch. See [PUBLISHED-MIGRATION.md](PUBLISHED-MIGRATION.md) for the reproducer
-> and the upstream compatibility issue. Baseline observations below describe PR #5.
+> **Draft migration: not ready to merge.** This branch now validates with the
+> official `rc-cli` v0.6.0, rather than the standalone profiler's incompatible
+> catalog API. The original five acceptance cases remain enabled. Published
+> definition URLs were returning HTTP 404 in CI on November 19, 2026, so
+> passing local-fixture tests must not be presented as real published-path
+> acceptance. See [PUBLISHED-MIGRATION.md](PUBLISHED-MIGRATION.md).
 
 **Same portable Profile + trusted upstream validation evidence + independent
 consumer support evaluation.**
@@ -31,7 +32,7 @@ Work. The local development runner below remains a fast test harness.
 ```text
 request-logger source declarations
         |
-        v  existing go-rc-profiler generation (including its validation)
+        v  official rc profile generate (Go profiler bundled with CLI)
 artifacts/request-logger-http.profile.yaml
         |
         v  cmd/validate: snapshot bytes, resolve closure, validate final artifact
@@ -79,11 +80,13 @@ limit; non-200 responses, invalid envelopes, malformed/multiple documents, and
 non-HTTPS requests or redirects fail closed. No alternative version or local
 source is tried on network failure.
 
-The existing profiler `ResolveExtensionClosure` and `ValidateProfileYAML` checks
-remain mandatory against private snapshots. Only the exact resolved closure is
-available to final validation and signing. **v0.6.0 currently rejects the published
-IDs at that first strict validation step**, as explained in the compatibility
-report. No evidence or signature is produced when that happens.
+The upstream producer invokes the official `rc profile validate - --catalog
+<private-snapshot>` command after resolving and capturing the exact extension
+closure. The CLI checks the embedded core schema, dependency graph, vocabulary,
+conflicts, and extension schemas without making another network request.
+The producer records the CLI executable digest, the exact Profile digest,
+and extension digests in signed evidence. On a failed validation or missing
+definition, no evidence or signature is produced.
 
 `-catalog DIR` explicitly selects offline mode, with duplicate IDs rejected.
 The runner and Go acceptance tests accept `EXTENSIONS_ROOT` for that explicit
