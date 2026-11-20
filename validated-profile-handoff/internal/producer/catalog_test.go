@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runtimeconditions/go-rc-profiler/extensioncheck"
 	"github.com/runtimeconditions/rc-demos/validated-profile-handoff/handoff"
 	resolver "github.com/runtimeconditions/rc-extension-resolver"
 )
@@ -124,21 +123,9 @@ func TestCatalogRejectsMissingDependencyInvalidAndConflictingDocuments(t *testin
 	}
 }
 
-// Keep the upstream incompatibility executable, rather than deleting version
-// annotations or rewriting the generated Profile to hide it. The original
-// acceptance suite still requires a successful real published-path handoff.
-func TestV060CatalogAPIIdentityIncompatibility(t *testing.T) {
-	snapshot := t.TempDir()
-	if _, err := snapshotWithLoader([]string{envID}, resolver.NewInMemoryLoader(publishedFixtures(t)), snapshot); err != nil {
-		t.Fatal(err)
-	}
-	_, err := extensioncheck.ResolveExtensionClosure([]extensioncheck.ExtensionReference{{ID: envID}}, extensioncheck.ProfileOptions{CatalogRoots: []string{snapshot}})
-	if err == nil || !strings.Contains(err.Error(), "missing extension definition") {
-		t.Fatalf("expected released identity mismatch, got %v", err)
-	}
-}
-
-func TestFailedPublishedValidationNeverReturnsSignedArtifacts(t *testing.T) {
+// Verify the actual published (version-annotated) definition bytes through the
+// independent rc-cli validation path. No source override or altered IDs.
+func TestRCValidatorAcceptsAnnotatedPublishedIDs(t *testing.T) {
 	profile, err := os.ReadFile("../../../artifacts/request-logger-http.profile.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -147,9 +134,29 @@ func TestFailedPublishedValidationNeverReturnsSignedArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := Validate(profile, "testdata", key, handoff.Digest([]byte("test")))
-	if err == nil || a != nil {
-		t.Fatalf("failed validation returned artifacts: %v, %v", a, err)
+	artifacts, err := Validate(profile, "testdata", key, handoff.Digest([]byte("test")))
+	if err != nil {
+		t.Fatalf("official rc CLI rejected published extension identities: %v", err)
+	}
+	if artifacts == nil || len(artifacts.Signature) != ed25519.SignatureSize || len(artifacts.Extensions) != 2 {
+		t.Fatalf("missing signed closure: %+v", artifacts)
+	}
+}
+
+// A semantically invalid Profile must never produce evidence or a signature.
+func TestFailedPublishedValidationNeverReturnsSignedArtifacts(t *testing.T) {
+	profile, err := os.ReadFile("../../../artifacts/request-logger-http.profile.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile = bytes.Replace(profile, []byte("engine: redis"), []byte("engine: imaginary"), 1)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifacts, err := Validate(profile, "testdata", key, handoff.Digest([]byte("test")))
+	if err == nil || artifacts != nil {
+		t.Fatalf("invalid Profile received signed artifacts: %v, %v", artifacts, err)
 	}
 }
 
