@@ -38,6 +38,11 @@ jobs:
             rc-demos/apps/request-logger-http/go.sum
             rc-demos/portable-profile/go.sum
             rc-demos/validated-profile-handoff/go.sum
+      - name: Install pinned rc-cli for generation and trusted validation
+        working-directory: rc-demos
+        run: |
+          rc_path="$(sh portable-profile/scripts/install-rc.sh)"
+          echo "RC_CLI=$rc_path" >> "$GITHUB_ENV"
       - name: Existing consumer and workload tests
         working-directory: rc-demos
         run: |
@@ -84,6 +89,11 @@ jobs:
           cache-dependency-path: |
             rc-demos/apps/request-logger-http/go.sum
             rc-demos/validated-profile-handoff/go.sum
+      - name: Install pinned rc-cli for cluster acceptance preparation
+        working-directory: rc-demos
+        run: |
+          rc_path="$(sh portable-profile/scripts/install-rc.sh)"
+          echo "RC_CLI=$rc_path" >> "$GITHUB_ENV"
       - name: Install cluster test tools
         run: |
           go install sigs.k8s.io/kind@v0.30.0
