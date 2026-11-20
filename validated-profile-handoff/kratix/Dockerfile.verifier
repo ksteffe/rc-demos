@@ -6,8 +6,7 @@ COPY validated-profile-handoff/go.mod validated-profile-handoff/go.sum ./
 COPY validated-profile-handoff/handoff ./handoff
 COPY validated-profile-handoff/kratixgate ./kratixgate
 COPY validated-profile-handoff/cmd/verify-kratix ./cmd/verify-kratix
-RUN go mod edit -droprequire=github.com/runtimeconditions/go-rc-profiler \
-    -droprequire=github.com/runtimeconditions/rc-extension-resolver && \
+RUN go mod edit -droprequire=github.com/runtimeconditions/rc-extension-resolver && \
     CGO_ENABLED=0 go build -trimpath -o /verify ./cmd/verify-kratix
 
 FROM alpine:3.22
