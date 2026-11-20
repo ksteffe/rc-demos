@@ -26,9 +26,9 @@ This tree contains runnable examples and downstream adapter assets.
 
 ## Generate the Request Logger Profile
 
-Use Go 1.25+ and run this from the repository root. The script downloads the
-checksum-pinned official profiler v0.6.0 binary and released binding modules;
-no sibling checkout is needed:
+Use Go 1.25+ and run this from the repository root. The script installs the
+checksum-pinned official `rc-cli` v0.6.0 release (which embeds the Go profiler
+v0.8.0) and uses published binding modules; no sibling checkout is needed:
 
 ```sh
 portable-profile/scripts/generate-profile.sh
@@ -66,15 +66,15 @@ Once installed, `rc profile validate artifacts/request-logger-http.profile.yaml`
 is a useful *exploratory* CLI check; this PR does **not** claim that command
 passes against its published definitions.
 
-**Do not substitute this floating package-manager install for this branch's
-pinned generation or trusted handoff checks.** `rc-cli` v0.6.0 bundles Go
-profiler **v0.8.0**, whereas the canonical generation script and handoff module
-here pin the standalone profiler **v0.6.0**. The handoff signs exact Profile
-and extension bytes only after strict validation against the captured catalog;
-a standalone `rc profile validate` call is not equivalent. See
-[the migration compatibility report](validated-profile-handoff/PUBLISHED-MIGRATION.md).
-The upstream [catalog identity fix](https://github.com/runtimeconditions/go-rc-profiler/pull/2)
-remains outstanding. Keep the existing acceptance tests enabled and fail-closed.
+**For reproducible CI, use the committed `install-rc.sh` rather than a floating
+package-manager version.** PR #6 now invokes `rc profile validate` with the
+private **captured snapshot** using `--catalog`, preserving exact Profile and
+extension bytes in signed evidence. Validation does not download another
+catalog copy. The independent rc-cli validator accepts unversioned full
+extension URL identities with version-annotated definitions; no dependency
+on the unmerged [profiler fix](https://github.com/runtimeconditions/go-rc-profiler/pull/2)
+remains. See [the migration report](validated-profile-handoff/PUBLISHED-MIGRATION.md)
+for acceptance evidence and outstanding limitations.
 
 ## Generate the Java Request Logger Profile
 
