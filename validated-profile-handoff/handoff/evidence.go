@@ -86,10 +86,9 @@ func Envelope(data []byte) ([]string, error) {
 	seen = map[string]bool{}
 	for _, v := range raw {
 		id, ok := v.(string)
-		if !ok || id == "" || seen[id] {
+		if !ok || id == "" {
 			return nil, fail("profile_unusable", "extensions need unique nonempty IDs")
 		}
-		seen[id] = true
 		// The published generator can encode complete definition URLs as
 		// <short-https-url>:<version>. Expand the reference for snapshot
 		// retrieval and signed identity comparisons, without changing Profile
@@ -101,6 +100,10 @@ func Envelope(data []byte) ([]string, error) {
 				fullID = id[:lastColon] + "/" + id[lastColon+1:] + "/runtimeconditions.extension.yaml"
 			}
 		}
+		if seen[fullID] {
+			return nil, fail("profile_unusable", "duplicate canonical extension ID")
+		}
+		seen[fullID] = true
 		ids = append(ids, fullID)
 	}
 	slices.Sort(ids)
