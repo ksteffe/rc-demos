@@ -63,7 +63,7 @@ the same blocker. This is not a successful five-case acceptance run.
 Runtime Conditions now provides `rc-cli` through Homebrew, apt, and dnf/yum.
 The latest published `rc-cli` release checked for this update is **v0.6.0**
 (published November 18, 2026). Its
-[`components.lock.yaml`](https://github.com/runtimeconditions/rc-cli/blob/main/distribution/components.lock.yaml)
+[`components.lock.yaml`](https://github.com/runtimeconditions/rc-cli/blob/v0.6.0/distribution/components.lock.yaml)
 pins the **Go profiler v0.8.0** with core schema **0.4.0**. This is a different
 version coordinate from the **standalone go-rc-profiler v0.6.0** used by this
 branch's generation script and producer module. Do not conflate the two
