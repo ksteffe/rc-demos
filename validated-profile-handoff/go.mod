@@ -3,7 +3,6 @@ module github.com/runtimeconditions/rc-demos/validated-profile-handoff
 go 1.27.0
 
 require (
-	github.com/runtimeconditions/go-rc-profiler v0.6.0
 	github.com/runtimeconditions/rc-extension-resolver v0.0.0-20261005083147-3cc942274975
 	gopkg.in/yaml.v3 v3.0.1
 )
