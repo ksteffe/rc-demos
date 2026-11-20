@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"slices"
 
 	"gopkg.in/yaml.v3"
@@ -89,7 +90,18 @@ func Envelope(data []byte) ([]string, error) {
 			return nil, fail("profile_unusable", "extensions need unique nonempty IDs")
 		}
 		seen[id] = true
-		ids = append(ids, id)
+		// The published generator can encode complete definition URLs as
+		// <short-https-url>:<version>. Expand the reference for snapshot
+		// retrieval and signed identity comparisons, without changing Profile
+		// artifact bytes.
+		fullID := id
+		if strings.HasPrefix(id, "https://") {
+			lastColon, lastSlash := strings.LastIndex(id, ":"), strings.LastIndex(id, "/")
+			if lastColon > lastSlash && lastColon < len(id)-1 {
+				fullID = id[:lastColon] + "/" + id[lastColon+1:] + "/runtimeconditions.extension.yaml"
+			}
+		}
+		ids = append(ids, fullID)
 	}
 	slices.Sort(ids)
 	return ids, nil
