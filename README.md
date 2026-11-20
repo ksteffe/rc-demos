@@ -59,8 +59,9 @@ rc --version
 rc plugins list
 ```
 
-For Debian/Ubuntu and Fedora/RHEL, follow the
-[official package installation instructions](https://github.com/runtimeconditions/rc-cli).
+For Debian/Ubuntu and Fedora/RHEL, the announced package-repository
+bootstrap script is at [runtimeconditions.io/packages/setup.sh](https://runtimeconditions.io/packages/setup.sh).
+Review it before execution, then install `rc-cli` with `apt` or `dnf`.
 Once installed, `rc profile validate artifacts/request-logger-http.profile.yaml`
 is a useful *exploratory* CLI check; this PR does **not** claim that command
 passes against its published definitions.
