@@ -76,14 +76,17 @@ rejection terminates promptly rather than becoming a retry loop.
 ## Run and inspect
 
 Prerequisites: Docker, Go 1.27.3, Python with PyYAML, kubectl, and KinD.
-Published modules and the checksum-pinned profiler release replace sibling
-checkouts. Preparation resolves extension URLs over HTTPS, with no local
-fallback. See the parent README for versions and network requirements.
+Published Go binding modules and the checksum-pinned `rc-cli` release replace
+sibling checkouts. Export `RC_CLI="$(sh portable-profile/scripts/install-rc.sh)"`
+from the repository root for a local run. The producer validates the exact
+extension snapshot using `rc profile validate --catalog`. Live preparation
+retrieves definition URLs over HTTPS, with no local fallback.
 
-**Draft migration limitation:** request preparation currently fails closed because
-profiler v0.6.0's strict catalog API rejects the published definition identity.
-The five-case cluster contract below remains required, not a passing result on
-this branch. See [the compatibility report](../PUBLISHED-MIGRATION.md).
+**Draft publication limitation:** the official published definition URLs
+returned HTTP 404 in CI on November 19, 2026. The five-case cluster contract
+below remains required, and cannot pass until valid definitions are published
+at their declared URLs. Offline fixture tests are not a substitute for this
+real-cluster acceptance. See [the compatibility report](../PUBLISHED-MIGRATION.md).
 From the repository root:
 
 ```sh
