@@ -16,8 +16,6 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
-github.com/runtimeconditions/go-rc-profiler v0.6.0 h1:QSW5TCjZwLUYyxK2QlCwN6Sh1jICt6PbLbPVRJHDD+U=
-github.com/runtimeconditions/go-rc-profiler v0.6.0/go.mod h1:zQSOr50hlFxqJL2AaF3BpgTMbOlykey9OBa17E/jWFA=
 github.com/runtimeconditions/rc-extension-resolver v0.0.0-20261005083147-3cc942274975 h1:vlTmnvtYCmvwKZcxVbBSm9P39wKLQVqJwJNcwJN+ZvY=
 github.com/runtimeconditions/rc-extension-resolver v0.0.0-20261005083147-3cc942274975/go.mod h1:JSJGMJW3MbTOccifXB5hXrM04AxOXM3nYFmqt4mOKZ8=
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 h1:1EYB5IzjZawrrnELUi78f9fPu57HuXjmddZPjrls/28=
