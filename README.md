@@ -45,6 +45,36 @@ cd apps/request-logger-http
 go test ./...
 ```
 
+## Packaged `rc` CLI (optional local exploration)
+
+As of November 18, 2026, Runtime Conditions publishes the unified
+[`rc-cli` v0.6.0](https://github.com/runtimeconditions/rc-cli/releases/tag/v0.6.0)
+through Homebrew and Linux packages. Its `rc` executable provides profile
+generation and validation, built-in Go profiling, and optional language
+profiler discovery. On macOS, for example:
+
+```sh
+brew install runtimeconditions/tools/rc-cli
+rc --version
+rc plugins list
+```
+
+For Debian/Ubuntu and Fedora/RHEL, follow the
+[official package installation instructions](https://github.com/runtimeconditions/rc-cli).
+Once installed, `rc profile validate artifacts/request-logger-http.profile.yaml`
+is a useful *exploratory* CLI check; this PR does **not** claim that command
+passes against its published definitions.
+
+**Do not substitute this floating package-manager install for this branch's
+pinned generation or trusted handoff checks.** `rc-cli` v0.6.0 bundles Go
+profiler **v0.8.0**, whereas the canonical generation script and handoff module
+here pin the standalone profiler **v0.6.0**. The handoff signs exact Profile
+and extension bytes only after strict validation against the captured catalog;
+a standalone `rc profile validate` call is not equivalent. See
+[the migration compatibility report](validated-profile-handoff/PUBLISHED-MIGRATION.md).
+The upstream [catalog identity fix](https://github.com/runtimeconditions/go-rc-profiler/pull/2)
+remains outstanding. Keep the existing acceptance tests enabled and fail-closed.
+
 ## Generate the Java Request Logger Profile
 
 From the repository root:
