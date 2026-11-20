@@ -58,6 +58,40 @@ All five end-to-end cases are still enabled; they cannot reach consumer assertio
 because their real producer setup fails. Python platform adapter preparation has
 the same blocker. This is not a successful five-case acceptance run.
 
+## Unified CLI distribution update (2026-11-19)
+
+Runtime Conditions now provides `rc-cli` through Homebrew, apt, and dnf/yum.
+The latest published `rc-cli` release checked for this update is **v0.6.0**
+(published November 18, 2026). Its
+[`components.lock.yaml`](https://github.com/runtimeconditions/rc-cli/blob/main/distribution/components.lock.yaml)
+pins the **Go profiler v0.8.0** with core schema **0.4.0**. This is a different
+version coordinate from the **standalone go-rc-profiler v0.6.0** used by this
+branch's generation script and producer module. Do not conflate the two
+`v0.6.0` release numbers.
+
+The packaged `rc` executable exposes `rc profile generate`, `rc profile
+validate`, and `rc plugins list`. It is a better user-facing way to explore
+these demos and makes a source build unnecessary for ordinary local use.
+However, **installation is not a fix for the catalog identity mismatch**:
+the upstream [go-rc-profiler fix PR #2](https://github.com/runtimeconditions/go-rc-profiler/pull/2)
+remains open, and the released v0.8.0 source still parses bare full definition
+URLs with an empty `ExtensionReference.Version`. No successful end-to-end
+handoff validation under the newer packaged CLI has been established here.
+
+In addition, `rc profile validate <file>` by itself may fetch definitions
+directly from their URLs. It is not interchangeable with this producer's
+requirement to validate against its **private snapshot of exact retrieved
+definition bytes**, sign their digests, and leave the downstream verifier free
+of Runtime Conditions validator dependencies. Package-manager installs may
+also advance to new versions, so they must not silently replace the currently
+pinned release binary in reproducibility-sensitive CI.
+
+A future compatibility upgrade should evaluate the released fix, independently
+pin the CLI and profiler component versions/checksums, regenerate and diff the
+Profile, preserve the producer's exact-snapshot and fail-closed properties, and
+rerun **all five** acceptance cases plus real KinD/Kratix integration. Until
+then, the existing blocker and current test expectations remain unchanged.
+
 ## Required next step
 
 A corrected upstream profiler release needs catalog identity handling consistent
