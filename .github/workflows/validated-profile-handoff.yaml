@@ -24,6 +24,28 @@ permissions:
   contents: read
 
 jobs:
+  fixture-handoff:
+    name: Offline published-fixture acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: rc-demos
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.3"
+          cache-dependency-path: rc-demos/validated-profile-handoff/go.sum
+      - name: Install pinned released rc-cli
+        working-directory: rc-demos
+        run: |
+          rc_path="$(sh portable-profile/scripts/install-rc.sh)"
+          echo "RC_CLI=$rc_path" >> "$GITHUB_ENV"
+      - name: All five handoff cases against unchanged published definition fixtures
+        working-directory: rc-demos/validated-profile-handoff
+        env:
+          EXTENSIONS_ROOT: internal/producer/testdata
+        run: go test -v ./...
   handoff:
     runs-on: ubuntu-latest
     timeout-minutes: 15
